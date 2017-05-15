@@ -1,0 +1,31 @@
+// Operator at the exponent precence level
+exp_op := '^' | '-'
+// Operator at the multiply/divide precence level
+mul_op := '*' | '/'
+// Operator at the +/- precence level
+pm_op := '+' | '-'
+// Operator at the unary precence level
+unary_op := '-' | '~'
+
+expression := mul_expr pm_op mul_expr | mul_expr
+mul_expr := exp_expr mul_op exp_expr | exp_expr
+exp_expr := unary_expr exp_op unary_expr | unary_expr
+unary_expr := unary_op par_expr | par_expr
+par_expr := '(' expression ')' | func_call | name | vector | number
+
+func_call := name '(' arg_list_head ')'
+arg_list_head := arg_list_tail | .
+arg_list_tail := expression ',' arg_list_tail | expression
+
+name := [a-zA-Z_][a-zA-Z0-9_]+
+
+vector := '<' vec_list '>'
+vec_list := expression ',' vec_list | expression
+
+number := numeric_part unit_part | numeric_part
+numeric_part := scientific | decimal | integer
+integer := ('+' | '-' | .) [0-9]*
+decimal := [0-9]* '.' [0-9]* | '.' [0-9]*
+scientific := decimal ('e' | 'E') integer
+
+unit_part := <TODO: INCLUDE THIS PART>
