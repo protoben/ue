@@ -1,11 +1,13 @@
 module Data.Expression (Expr(..), Value(..), BinOp(..), UnaryOp(..), Relation(..),
-    containsSymbols, display, treeDepth) where
+    containsSymbols, display, treeDepth, subst, substVar) where
 
 import Data.List
+import Data.Maybe
 
 data BinOp = Add | Subtract | Multiply | Divide | Power deriving (Show,Eq)
 data UnaryOp = Negate deriving (Show, Eq)
-data Relation = Equal | Lesser | Greater | LesserEqual | GreaterEqual deriving (Show, Eq)
+data Relation = Equal | Lesser | Greater | LesserEqual
+    | GreaterEqual deriving (Show, Eq)
 type Name = String
 
 data Value = IntValue Integer | -- basic arbitrary-precision integer
@@ -37,7 +39,8 @@ displayVal (ExactReal n e) = (\(a,b)->concat [a,".",b]) $
 displayVal (Vec2 a b) = concat ["<", displayVal a, ", ", displayVal b, ">"]
 displayVal (VecN xs) = concat ["<", intercalate ", " $ map displayVal xs, ">"]
 
-data ParentType = TopLevel | AddSub | Sub | Mul | Div | PowerLeft | PowerRight | Unary deriving Eq
+data ParentType = TopLevel | AddSub | Sub | Mul | Div | PowerLeft |
+    PowerRight | Unary deriving Eq
 
 pars :: [String] -> String
 pars xs = '(':(concat $ xs ++ [")"])
@@ -45,16 +48,29 @@ pars xs = '(':(concat $ xs ++ [")"])
 -- Show an expression, properly parenthesized given the kind of expression it's
 -- contained within.
 display' :: ParentType -> Expr -> String
-display' _ (RelationExpr Equal a b) = concat [display' TopLevel a, "=", display' TopLevel b]
-display' _ (RelationExpr Lesser a b) = concat [display' TopLevel a, "<", display' TopLevel b]
-display' _ (RelationExpr Greater a b) = concat [display' TopLevel a, ">", display' TopLevel b]
-display' _ (RelationExpr LesserEqual a b) = concat [display' TopLevel a, "<=", display' TopLevel b]
-display' _ (RelationExpr GreaterEqual a b) = concat [display' TopLevel a, ">=", display' TopLevel b]
-display' p (BinaryExpr Add a b) = (if p `elem` [TopLevel, AddSub] then concat else pars) [display' AddSub a, "+", display' AddSub b]
-display' p (BinaryExpr Subtract a b) = (if p `elem` [TopLevel, AddSub] then concat else pars) [display' AddSub a, "-", display' Sub b]
-display' p (BinaryExpr Multiply a b) = (if p `elem` [TopLevel, AddSub, Sub, Mul] then concat else pars) [display' Mul a, "*", display' Mul b]
-display' p (BinaryExpr Divide a b) = concat [display' Div a, "/", display' Div b]
-display' p (BinaryExpr Power a b) = concat [display' PowerLeft a, "^", display' PowerRight b]
+display' _ (RelationExpr Equal a b) = concat
+    [display' TopLevel a, "=", display' TopLevel b]
+display' _ (RelationExpr Lesser a b) = concat
+    [display' TopLevel a, "<", display' TopLevel b]
+display' _ (RelationExpr Greater a b) = concat
+    [display' TopLevel a, ">", display' TopLevel b]
+display' _ (RelationExpr LesserEqual a b) = concat
+    [display' TopLevel a, "<=", display' TopLevel b]
+display' _ (RelationExpr GreaterEqual a b) = concat
+    [display' TopLevel a, ">=", display' TopLevel b]
+display' p (BinaryExpr Add a b) =
+    (if p `elem` [TopLevel, AddSub] then concat else pars)
+    [display' AddSub a, "+", display' AddSub b]
+display' p (BinaryExpr Subtract a b) =
+    (if p `elem` [TopLevel, AddSub] then concat else pars)
+    [display' AddSub a, "-", display' Sub b]
+display' p (BinaryExpr Multiply a b) =
+    (if p `elem` [TopLevel, AddSub, Sub, Mul] then concat else pars)
+    [display' Mul a, "*", display' Mul b]
+display' p (BinaryExpr Divide a b) = concat
+    [display' Div a, "/", display' Div b]
+display' p (BinaryExpr Power a b) = concat
+    [display' PowerLeft a, "^", display' PowerRight b]
 display' p (UnaryExpr Negate a) = (if p == TopLevel then concat else pars)
     ["-", display' Unary a]
 display' _ (FuncCall nm args) = concat
@@ -72,3 +88,23 @@ treeDepth (UnaryExpr _ x) = 1 + (treeDepth x)
 treeDepth (FuncCall _ xs) = 1 + (foldl' max 0 $ map treeDepth xs)
 treeDepth (NameRef _) = 1
 treeDepth (Constant _) = 1
+
+-- Perform a substitution over each element in the tree. The results from the
+-- substitution function are not themselves substituted, to prevent infinite
+-- recursion. When the substitution function returns Nothing, the passed element
+-- will not be modified.
+subst :: (Expr -> Maybe Expr) -> Expr -> Expr
+subst f x@(RelationExpr rel l r) =
+    fromMaybe (RelationExpr rel (subst f l) (subst f r)) $ f x
+subst f x@(BinaryExpr op l r) =
+    fromMaybe (BinaryExpr op (subst f l) (subst f r)) $ f x
+subst f x@(UnaryExpr op e) = fromMaybe (UnaryExpr op $ subst f e) $ f x
+subst f x@(FuncCall n es) = fromMaybe (FuncCall n $ map (subst f) es) $ f x
+subst f x@(NameRef n) = fromMaybe x $ f x
+subst f x@(Constant v) = fromMaybe x $ f x
+
+-- Utility function for substituting a single variable
+substVar :: String -> Expr -> Expr -> Expr
+substVar tgt e = subst (\x->case x of
+    NameRef n -> if n == tgt then (Just e) else Nothing
+    _         -> Nothing)

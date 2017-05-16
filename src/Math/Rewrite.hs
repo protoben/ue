@@ -1,4 +1,4 @@
-module Math.Rewrite  where
+module Math.Rewrite (reductions, simplify) where
 
 import Data.List
 import Data.Maybe
@@ -71,7 +71,9 @@ rewriteRules =
     (a =* (b =/ a), b), ((b =/ a) =* a, b), ((a =* b) =/ a, b), ((b =* a) =/ a, b),
     ((n =* a) =/ m, (n =/ m) =* a), ((a =* n) =/ m, (n =/ m) =* a),
     (a =+ a, csti 2 =* a),
-    (a=*b =+ a, a =* (b =+ csti 1)), (b=*a =+ a, a =* (b =+ csti 1)),
+    (a =+ b=*a, (b =+ csti 1) =* a), (a =+ a=*b, (b =+ csti 1) =* a),
+    (a =- b=*a, (b =- csti 1) =* a), (a =- a=*b, (b =- csti 1) =* a),
+    ((neg a) =+ b=*a, (b =- csti 1) =* a), ((neg a) =+ a=*b, (b =- csti 1) =* a),
     (a=*b =+ a=*c, a =* (b =+ c)), (b=*a =+ c=*a, a =* (b =+ c)), -- factoring out coefficients
     (a =- (b =+ c), a =+ (neg b =+ neg c)), -- distribute subtraction
     (a =- (b =- c), a =+ (neg b =+ c)), -- distribute subtraction
