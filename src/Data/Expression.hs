@@ -34,8 +34,8 @@ containsSymbols (BinaryExpr _ a b) = containsSymbols a || containsSymbols b
 
 displayVal :: Value -> String
 displayVal (IntValue i) = show i
-displayVal (ExactReal n e) = (\(a,b)->concat [a,".",b]) $
-    splitAt (fromIntegral e) $ show n
+displayVal (ExactReal n e) = let s = show n in (\(a,b)->concat [a,".",b]) $
+    splitAt (length s + fromIntegral e) s
 displayVal (Vec2 a b) = concat ["<", displayVal a, ", ", displayVal b, ">"]
 displayVal (VecN xs) = concat ["<", intercalate ", " $ map displayVal xs, ">"]
 

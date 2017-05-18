@@ -1,4 +1,4 @@
-module Text.Expression (expr, readExpr) where
+module Text.Expression (expr, readExpr, funcCall) where
 
 import Data.Expression
 
@@ -45,13 +45,15 @@ value = inSpace (vector <|> try number) where
         return $ IntValue $ read (sign ++ digs)
 
 -- expression parsing
+funcCall :: Parser Expr
+funcCall = try $ liftM2 FuncCall name (between
+    (symbol "(") (symbol ")")
+    (sepBy expr (symbol ",")))
+
 term :: Parser Expr
 term = parenthesized <|> funcCall <|> nameRef <|> (liftM Constant value)
     where
         parenthesized = between (symbol "(") (symbol ")") mathExpr
-        funcCall = try $ liftM2 FuncCall name (between
-            (symbol "(") (symbol ")")
-            (sepBy expr (symbol ",")))
         nameRef = liftM NameRef name
 
 mathExpr :: Parser Expr

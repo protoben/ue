@@ -54,6 +54,7 @@ rewriteRules =
 
     -- simple properties
     (a =- a, csti 0), (a =- csti 0, a), (csti 0 =- a, neg a),
+    (neg a =+ a, csti 0), (a =+ (neg a), csti 0),
     (a =+ csti 0, a), (csti 0 =+ a, a),
     (a =* csti 0, csti 0), (csti 0 =* a, csti 0),
     (a =* csti 1, a), (csti 1 =* a, a),
@@ -100,11 +101,16 @@ rewriteRules =
     ((m =^ a) =* (n =^ a), (m =* n) =^ a),
 
     -- basic equality simplifications
-    (x =: x, csti 1 =: csti 1), -- only do this for nonliterals for now, until we can produce boolean values
+    -- only do this for nonliterals for now, until we can produce boolean values
+    (x =: x, csti 1 =: csti 1),
     (n =: x, x =: n), -- constants always on right side of equality
     (a =* b =: a =* c, b =: c), (b =* a =: a =* c, b =: c),
     (a =* b =: c =* a, b =: c), (b =* a =: c =* a, b =: c),
-    (a =* b =: a, b =: csti 1), (b =* a =: a, b =: csti 1)
+    (a =* b =: a, b =: csti 1), (b =* a =: a, b =: csti 1),
+    (a =+ b =: c =+ b, a =: c), (b =+ a =: c =+ b, a =: c), -- subtract both sides
+    (a =+ b =: b =+ c, a =: c), (b =+ a =: b =+ c, a =: c), -- subtract both sides
+    (a =+ b =: m =* b, a =: b =* (m =- csti 1)),  -- subtract from multiplication
+    (a =+ b =: m =* a, b =: a =* (m =- csti 1))
     ]
     where
         cst :: Value -> RRExpr
@@ -199,7 +205,11 @@ sortExprGroups :: [[Expr]] -> [[Expr]]
 sortExprGroups = sortBy (\(a:_) (b:_)->mconcat $ map (\f->f a b) [depth, naming])
     where
         depth :: Expr -> Expr -> Ordering
-        depth = compare `on` treeDepth
+        depth = compare `on` td
+
+        td :: Expr -> Integer
+        td (UnaryExpr Negate a) = td a
+        td x = treeDepth x
 
         naming :: Expr -> Expr -> Ordering
         naming (NameRef a) (NameRef b) = compare a b

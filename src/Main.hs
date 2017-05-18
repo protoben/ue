@@ -1,32 +1,51 @@
 module Main where
 
+import Text.Parsec
+
+import Data.List
 import Data.Expression
 import Text.Expression
-import Text.Parsec
+import Text.REPL
+
+import Math.REPL
 import Math.Rewrite
-import Math.Environment
 
 import Control.Monad
 import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
 
 parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (expr >>= (\x->eof >> return x)) "cmd"
 
-replOnce :: EnvT IO ()
-replOnce = do
-    ln <- lift getLine
-    let (debugging, parseResult) = if take 1 ln == ":"
-        then (True, parseExpr (tail ln))
-        else (False, parseExpr ln)
+printExpr :: (MonadIO m) => Expr -> m ()
+printExpr = liftIO . putStrLn . display
 
-    if debugging
-    then (either (\x->lift $ print x) (\x->do
-        s <- substFuncs x >>= substVars
-        lift $ mapM_ putStrLn $ map display $ reductions s) parseResult)
-    else (either (\x->lift $ print x) (\x->do
-        s <- substFuncs x >>= substVars
-        lift $ putStrLn $ display $ simplify s) parseResult)
+replDo :: REPLCommand -> ReplT IO ()
+replDo (Evaluate Normal e) = substFuncs e >>= substVars >>= (printExpr . simplify)
+replDo (Evaluate Symbolic e) = substFuncs e >>= substVars >>= (printExpr.simplify)
+replDo (Evaluate ShowReductions e) = do
+    a <- substFuncs e
+    b <- substVars a
+    let history = mapAccumL (\i e->(i+1, (show i) ++ ". " ++ (display e))) 1
+            (a:b:reductions b)
+    liftIO $ mapM_ putStrLn $ snd history
+replDo (Evaluate AvoidExpansion e) = printExpr $ simplify e
+replDo (Evaluate Verbatim e) = printExpr e
+replDo (Evaluate Numeric e) = substFuncs e >>= substVars >>=
+    ((\s->if containsSymbols s then
+            liftIO $ putStrLn "Failed: expression is not concrete"
+        else return ()) . simplify)
+replDo (VarBind n e) = bindVar n e
+replDo Help = return ()
+replDo NoAction = return ()
+replDo _    = liftIO $ putStrLn "Unknown REPL command"
+
+replOnce :: ReplT IO ()
+replOnce = do
+    parseResult <- liftIO readRepl
+    case parseResult of
+        Left e -> liftIO $ print e
+        Right c -> replDo c
 
 main :: IO ()
-main = evalEnvT emptyEnv $ withBindings [] [] $
-    forever replOnce
+main = runReplT $ withBindings [] [] $ forever replOnce
