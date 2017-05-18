@@ -84,7 +84,7 @@ display = display' TopLevel
 treeDepth :: (Num a, Ord a) => Expr -> a
 treeDepth (RelationExpr _ l r) = 1 + (max (treeDepth l) (treeDepth r))
 treeDepth (BinaryExpr _ l r) = 1 + (max (treeDepth l) (treeDepth r))
-treeDepth (UnaryExpr _ x) = 1 + (treeDepth x)
+treeDepth (UnaryExpr o x) = (if o == Negate then 0 else 1) + (treeDepth x)
 treeDepth (FuncCall _ xs) = 1 + (foldl' max 0 $ map treeDepth xs)
 treeDepth (NameRef _) = 1
 treeDepth (Constant _) = 1

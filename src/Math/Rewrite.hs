@@ -64,7 +64,8 @@ rewriteRules =
     (neg $ neg a, a),
 
     -- addition/subtraction
-    (a =+ neg b, a =- b), (a =- neg b, a =+ b),
+    (a =+ neg a, csti 0), (a =- neg a, a =+ a),
+    (a =+ (b =+ neg a), b), (a =+ (neg a =+ b), b),
     (a =+ (b =+ a), b =+ a =* csti 2), (a =+ (a =+ b), b =+ a =* csti 2),
     ((b =+ a) =+ a, b =+ a =* csti 2), ((a =+ b) =+ a, b =+ a =* csti 2),
 
@@ -205,18 +206,14 @@ sortExprGroups :: [[Expr]] -> [[Expr]]
 sortExprGroups = sortBy (\(a:_) (b:_)->mconcat $ map (\f->f a b) [depth, naming])
     where
         depth :: Expr -> Expr -> Ordering
-        depth = compare `on` td
-
-        td :: Expr -> Integer
-        td (UnaryExpr Negate a) = td a
-        td x = treeDepth x
+        depth = compare `on` treeDepth
 
         naming :: Expr -> Expr -> Ordering
         naming (NameRef a) (NameRef b) = compare a b
-        naming a@(NameRef _) (UnaryExpr _ b) = naming a b
         naming a@(NameRef _) (BinaryExpr _ l r) = (naming a l) `mappend` (naming a r)
         naming a@(NameRef _) (Constant _) = GT
-        naming (UnaryExpr _ a) b@(NameRef _) = naming a b
+        naming (UnaryExpr _ a) b = naming a b
+        naming a (UnaryExpr _ b) = naming a b
         naming (BinaryExpr _ l r) b@(NameRef _) = (naming l b) `mappend` (naming r b)
         naming (Constant _) b@(NameRef _) = LT
         naming _ _ = EQ
