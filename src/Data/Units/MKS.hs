@@ -14,18 +14,18 @@ a = BaseUnit "A" "Ampere" Current
 -- the system itself
 mks :: UnitSystem
 mks = system [kg,m,cd,s,k,a] $ do
-    hz <- unit "Hz" "hertz"  $ inv s
-    n  <- unit "N"  "newton" $ (kg >* m) >/ (s >* s)
-    pa <- unit "Pa" "pascal" $ n >/ (m >* m)
-    j  <- unit "J"  "joule"  $ n >* m
-    w  <- unit "W"  "watt"   $ j >/ s
-    c  <- unit "C"  "coulomb"$ s >* a
-    v  <- unit "V"  "volt"   $ w >/ a
-    f  <- unit "F"  "farad"  $ c >/ v
-    ohm<- unit "Ω"  "ohm"    $ v >/ a
-    siemens <- unit "S" "siemens" $ inv ohm
-    wb <- unit "Wb" "weber"  $ j >/ a
-    t  <- unit "T"  "tesla"  $ (v >* s) >/ (m >* m)
-    h  <- unit "H"  "henry"  $ (v >* s) >/ a
-    sv <- unit "Sv" "sievert"$ j >/ kg
+    hz <- siPrefixed $ unit "Hz" "hertz"  $ inv s
+    n  <- siPrefixed $ unit "N"  "newton" $ (kg >* m) >/ (s >* s)
+    pa <- siPrefixed $ unit "Pa" "pascal" $ n >/ (m >* m)
+    j  <- siPrefixed $ unit "J"  "joule"  $ n >* m
+    w  <- siPrefixed $ unit "W"  "watt"   $ j >/ s
+    c  <- siPrefixed $ unit "C"  "coulomb"$ s >* a
+    v  <- siPrefixed $ unit "V"  "volt"   $ w >/ a
+    f  <- siPrefixed $ unit "F"  "farad"  $ c >/ v
+    ohm<- siPrefixed $ unit "Ω"  "ohm"    $ v >/ a
+    siemens <- siPrefixed $ unit "S" "siemens" $ inv ohm
+    wb <- siPrefixed $ unit "Wb" "weber"  $ j >/ a
+    t  <- siPrefixed $ unit "T"  "tesla"  $ (v >* s) >/ (m >* m)
+    h  <- siPrefixed $ unit "H"  "henry"  $ (v >* s) >/ a
+    sv <- siPrefixed $ unit "Sv" "sievert"$ j >/ kg
     return ()
