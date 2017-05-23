@@ -9,6 +9,9 @@ import Text.REPL
 
 import Math.REPL
 import Math.Rewrite
+import Math.Approximate
+
+import Data.Units
 
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -31,10 +34,12 @@ replDo (Evaluate ShowReductions e) = do
     liftIO $ mapM_ putStrLn $ snd history
 replDo (Evaluate AvoidExpansion e) = printExpr $ simplify e
 replDo (Evaluate Verbatim e) = printExpr e
-replDo (Evaluate Numeric e) = substFuncs e >>= substVars >>=
-    ((\s->if containsSymbols s then
-            liftIO $ putStrLn "Failed: expression is not concrete"
-        else return ()) . simplify)
+replDo (Evaluate Numeric e) = liftM simplify (substFuncs e >>= substVars) >>=
+    (\e->if containsSymbols e
+         then liftIO $ putStrLn "Failed: expression is not concrete"
+         else case (approx e) of
+            Left err -> liftIO $ print err
+            Right v  -> liftIO $ putStrLn $ display $ Constant v)
 replDo (VarBind n e) = bindVar n e
 replDo Help = return ()
 replDo NoAction = return ()
