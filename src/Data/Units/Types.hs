@@ -1,6 +1,8 @@
 module Data.Units.Types where
 
 import Data.List
+import Data.Function
+import Control.Arrow
 
 data BaseDimension = Mass | Distance | Luminosity | Time | Temperature | Current
     deriving (Show, Eq, Ord)
@@ -27,7 +29,7 @@ reduceDim (Dimension ts bs) = reducer (sort ts) (sort bs) where
 -- basic unit types
 type Abbrev = String
 type Fullname = String
-data BaseUnit = BaseUnit Abbrev Fullname BaseDimension deriving Show
+data BaseUnit = BaseUnit Abbrev Fullname BaseDimension deriving (Show,Eq,Ord)
 data DerivedUnit = DerivedUnit Abbrev Fullname
     [(Rational,BaseUnit)] [(Rational,BaseUnit)] deriving Show
 
@@ -47,8 +49,8 @@ instance Dimensioned DerivedUnit where
             (tts,tbs) = onBoth concat $ unzip $ map (\(Dimension t b)->(t,b)) $ dimensions ts
             (bts,bbs) = onBoth concat $ unzip $ map (\(Dimension t b)->(t,b)) $ dimensions bs
 
-checkDims :: (Dimensioned a, Dimensioned b) => a -> b -> Bool
-checkDims a b = (dimension a) == (dimension b)
+isCompat :: (Dimensioned a, Dimensioned b) => a -> b -> Bool
+isCompat a b = (dimension a) == (dimension b)
 
 multiplyDims :: Dimension -> Dimension -> Dimension
 multiplyDims (Dimension ts bs) (Dimension ts' bs') = reduceDim $
@@ -58,3 +60,47 @@ multiplyDims (Dimension ts bs) (Dimension ts' bs') = reduceDim $
 data UnitSystem = UnitSystem {
     baseUnits :: [BaseUnit],
     derivedUnits :: [DerivedUnit] } deriving Show
+
+-- anonymous unit type used when evaluating expressions
+newtype AnonymousUnit = AnonymousUnit
+    ([(Rational,BaseUnit)],[(Rational,BaseUnit)]) deriving Show
+class Unit a where
+    toFrac :: a -> AnonymousUnit
+
+instance Unit BaseUnit where
+    toFrac x = AnonymousUnit ([(1,x)],[])
+
+instance Unit DerivedUnit where
+    toFrac (DerivedUnit _ _ ts bs) = AnonymousUnit (ts,bs)
+
+instance Unit AnonymousUnit where
+    toFrac x = x
+
+(>*) :: (Unit a, Unit b) => a -> b -> AnonymousUnit
+(>*) a b = AnonymousUnit (aTop ++ bTop, aBot ++ bBot) where
+    (AnonymousUnit (aTop,aBot)) = toFrac a
+    (AnonymousUnit (bTop,bBot)) = toFrac b
+
+(>/) :: (Unit a, Unit b) => a -> b -> AnonymousUnit
+(>/) a b = AnonymousUnit (aTop ++ bBot, aBot ++ bTop) where
+    (AnonymousUnit (aTop,aBot)) = toFrac a
+    (AnonymousUnit (bTop,bBot)) = toFrac b
+
+inv :: (Unit a) => a -> AnonymousUnit
+inv = (\(AnonymousUnit (a,b))->(AnonymousUnit (b,a))) . toFrac
+
+reduceUnit :: Unit a => a -> AnonymousUnit
+reduceUnit u = reducer (sortFactors ts) (sortFactors bs) where
+    (AnonymousUnit (ts,bs)) = toFrac u
+    sortFactors :: [(a,BaseUnit)] -> [(a,BaseUnit)]
+    sortFactors = sortBy (compare `on` snd)
+    reducer [] ys = AnonymousUnit ([],ys)
+    reducer (x:xs) ys = if elem x ys then reducer xs (delete x ys) else
+        let (AnonymousUnit (ts,bs)) = reducer xs ys in AnonymousUnit (x:ts,bs)
+
+-- all units are dimensioned
+instance Dimensioned AnonymousUnit where
+    dimension (AnonymousUnit (t,b)) = Dimension dt db where
+        dimify :: (Rational,BaseUnit) -> BaseDimension
+        dimify = (\(BaseUnit _ _ x)->x) . snd
+        (dt,db) = (map dimify t, map dimify b)

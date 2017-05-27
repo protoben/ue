@@ -2,6 +2,7 @@ module Text.Expression (expr, readExpr, funcCall) where
 
 import Data.Expression
 
+import Text.Units
 import Text.Parsec
 import Text.Parsec.String
 import Text.Parsec.Expr

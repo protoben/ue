@@ -26,5 +26,5 @@ executable ue
 test-suite symbolic-reduction
   type: detailed-0.9
   hs-source-dirs: src
-  test-module: Math.Rewrite
+  test-module: Math.Rewrite.Test
   build-depends: base, QuickCheck, Cabal
