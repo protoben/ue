@@ -22,8 +22,8 @@ parseDerivedUnit = choice . map (try . parse') . derivedUnits
 
 parseSystemUnit :: UnitSystem -> Parser AnonymousUnit
 parseSystemUnit sys = choice [
-        liftM toFrac $ try $ parseBaseUnit sys,
-        liftM toFrac $ try $ parseDerivedUnit sys ]
+        liftM toFrac $ try $ parseDerivedUnit sys,
+        liftM toFrac $ try $ parseBaseUnit sys ]
 
 systems = [mks]
 
@@ -33,6 +33,8 @@ parsePrimUnit = choice $ map (try . parseSystemUnit) systems
 
 -- parse a composite unit
 parseUnit :: Parser AnonymousUnit
-parseUnit = choice [
-        liftM2 (>/) parsePrimUnit (char '/' >> parsePrimUnit)
+parseUnit = choice $ map try [
+        liftM2 (>/) parsePrimUnit (char '/' >> parseUnit),
+        liftM2 (>*) parsePrimUnit (char '*' >> parseUnit),
+        parsePrimUnit
     ]

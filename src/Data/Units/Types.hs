@@ -18,6 +18,7 @@ instance Eq Dimension where
         (Dimension ts bs,Dimension ts' bs') = (reduceDim a, reduceDim b) in
             (sort ts == sort ts') && (sort bs == sort bs')
 
+-- |Reduce the complexity of a passed Dimension by cancelling base units
 reduceDim :: Dimension -> Dimension
 reduceDim Dimensionless = Dimensionless
 reduceDim (Dimension ts bs) = reducer (sort ts) (sort bs) where
@@ -31,7 +32,7 @@ type Abbrev = String
 type Fullname = String
 data BaseUnit = BaseUnit Abbrev Fullname BaseDimension deriving (Show,Eq,Ord)
 data DerivedUnit = DerivedUnit Abbrev Fullname
-    [(Rational,BaseUnit)] [(Rational,BaseUnit)] deriving Show
+    [(Rational,BaseUnit)] [(Rational,BaseUnit)] deriving (Eq,Show)
 
 class Dimensioned a where
     dimension :: a -> Dimension
