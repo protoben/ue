@@ -4,6 +4,7 @@ import Data.List
 import Data.Maybe
 import Data.Function
 import Data.Expression
+import Data.Units
 
 import Control.Monad
 import Control.Applicative
@@ -117,7 +118,7 @@ rewriteRules =
         cst :: Value -> RRExpr
         cst = RRExpr . Constant
 
-        csti = cst . IntValue
+        csti n = cst (IntValue n noUnit)
 
 -- Check whether there are any conflicts in a match result and return Nothing if
 -- any are found.
@@ -227,25 +228,29 @@ reorderLikeTerms e = e
 
 -- Simplify integer arithmetic expressions
 simplifyArithmetic :: Reduction
-simplifyArithmetic (BinaryExpr Add
-    (Constant (IntValue a))
-    (Constant (IntValue b))) = Just $ Constant $ IntValue $ a+b
-simplifyArithmetic (BinaryExpr Subtract
-    (Constant (IntValue a))
-    (Constant (IntValue b))) = Just $ Constant $ IntValue $ a-b
-simplifyArithmetic (BinaryExpr Multiply
-    (Constant (IntValue a))
-    (Constant (IntValue b))) = Just $ Constant $ IntValue $ a*b
+simplifyArithmetic (BinaryExpr Add (Constant (IntValue a u))
+                                   (Constant (IntValue b v))) =
+                                   if isCompat u v
+                                   then Just $ Constant $ IntValue (a+b) u
+                                   else Nothing
+simplifyArithmetic (BinaryExpr Subtract (Constant (IntValue a u))
+                                        (Constant (IntValue b v))) =
+                                        if isCompat u v
+                                        then Just $ Constant $ IntValue (a-b) u
+                                        else Nothing
+simplifyArithmetic (BinaryExpr Multiply (Constant (IntValue a u))
+                                        (Constant (IntValue b v))) =
+                                        Just $ Constant $ IntValue (a*b) (u >* v)
 simplifyArithmetic (BinaryExpr Power -- whether to simplify constant chosen by heuristic
-    (Constant (IntValue a))
-    (Constant (IntValue b))) = if (a^b < 1000) then
-        Just $ Constant $ IntValue $ a^b else Nothing
+    (Constant (IntValue a u))
+    (Constant (IntValue b v))) = if (isCompat v noUnit && a^b < 1000) then
+        Just $ Constant $ IntValue (a^b) u else Nothing
 simplifyArithmetic (BinaryExpr Divide
-    (Constant (IntValue a))
-    (Constant (IntValue b))) = if (a `mod` b) == 0 then
-        (Just $ Constant $ IntValue $ (a `div` b)) else Nothing
-simplifyArithmetic (UnaryExpr Negate (Constant (IntValue n))) =
-    Just $ Constant $ IntValue $ negate n
+    (Constant (IntValue a u))
+    (Constant (IntValue b v))) = if (a `mod` b) == 0 then
+        (Just $ Constant $ IntValue (a `div` b) (u >/ v)) else Nothing
+simplifyArithmetic (UnaryExpr Negate (Constant (IntValue n u))) =
+    Just $ Constant $ IntValue (negate n) u
 simplifyArithmetic _ = Nothing
 
 -- Perform reduction on a subexpression, if possible. Return the original expr

@@ -1,20 +1,41 @@
 module Data.Expression (Expr(..), Value(..), BinOp(..), UnaryOp(..), Relation(..),
-    containsSymbols, display, treeDepth, subst, substVar) where
+    containsSymbols, display, treeDepth, subst, substVar, forceUnit) where
 
 import Data.List
 import Data.Maybe
+import Data.Units
 
 data BinOp = Add | Subtract | Multiply | Divide | Power deriving (Show,Eq)
 data UnaryOp = Negate deriving (Show, Eq)
 data Relation = Equal | Lesser | Greater | LesserEqual
     | GreaterEqual deriving (Show, Eq)
 type Name = String
+type AUnit = AnonymousUnit
 
-data Value = IntValue Integer | -- basic arbitrary-precision integer
-    ExactReal Integer Integer | -- exact real D*10^P stored as (D,P) pair
+data Value = IntValue Integer AUnit | -- basic arbitrary-precision integer
+    ExactReal Integer Integer AUnit | -- exact real D*10^P stored as (D,P) pair
     Vec2 Value Value | -- 2d vector, stored as (x,y)
     VecN [Value] -- N-dimensional vector
-    deriving (Show,Eq)
+    deriving Show
+
+instance Dimensioned Value where
+    dimension (IntValue _ u) = dimension u
+    dimension (ExactReal _ _ u) = dimension u
+    dimension (Vec2 _ _) = Dimensionless
+    dimension (VecN _) = Dimensionless
+
+-- |Forcibly rewrite the units of a value
+-- This function may lose information. Use with caution.
+forceUnit :: (Unit u) => u -> Value -> Value
+forceUnit u (IntValue i _) = IntValue i (toFrac u)
+forceUnit u (ExactReal d p _) = ExactReal d p (toFrac u)
+forceUnit u (Vec2 a b) = Vec2 (forceUnit u a) (forceUnit u b)
+forceUnit u (VecN xs) = VecN $ map (forceUnit u) xs
+
+-- TODO: Account for units that are multiples of each other
+instance Eq Value where
+    (==) (IntValue n _) (IntValue m _) = n == m
+    (==) _ _ = False
 
 data Expr =
     RelationExpr Relation Expr Expr |
@@ -33,8 +54,9 @@ containsSymbols (UnaryExpr _ e) = containsSymbols e
 containsSymbols (BinaryExpr _ a b) = containsSymbols a || containsSymbols b
 
 displayVal :: Value -> String
-displayVal (IntValue i) = show i
-displayVal (ExactReal n e) = let s = show n in (\(a,b)->concat [a,".",b]) $
+displayVal (IntValue i u) = show i ++ displayUnit u
+displayVal (ExactReal n e u) = let s = show n in
+    (\(a,b)->concat [a,".",b,displayUnit u]) $
     splitAt (length s + fromIntegral e) s
 displayVal (Vec2 a b) = concat ["<", displayVal a, ", ", displayVal b, ">"]
 displayVal (VecN xs) = concat ["<", intercalate ", " $ map displayVal xs, ">"]

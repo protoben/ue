@@ -1,6 +1,7 @@
 module Math.Approximate where
 
 import Data.Expression
+import Data.Units
 import Math.Functions
 
 import Control.Applicative
@@ -10,7 +11,10 @@ data ApproxMode =
     AvoidRounding Int |
     RoundTo Int
 
-data ApproxError = TypeError deriving Show
+data ApproxError = TypeError |
+    UnitsError AnonymousUnit AnonymousUnit |
+    UnitPowerError AnonymousUnit
+    deriving Show
 
 type ApproxResult = Either ApproxError Value
 
@@ -30,45 +34,60 @@ fpartExact (n,e) = case compare 0 e of
 
 -- flip the sign of the given value
 flipSign :: Value -> Value
-flipSign (IntValue a) = IntValue (-a)
-flipSign (ExactReal a e) = ExactReal (-a) e
+flipSign (IntValue a u) = IntValue (-a) u
+flipSign (ExactReal a e u) = ExactReal (-a) e u
 flipSign (Vec2 x y) = Vec2 (flipSign x) (flipSign y)
 flipSign (VecN xs) = VecN $ map flipSign xs
 
 -- raise a value to an exact integer power
-exactIntPower :: (Integer,Integer) -> Integer -> Value
-exactIntPower (n,e) p = ExactReal (n ^ p) (e * p)
+exactIntPower :: (Integer,Integer,AnonymousUnit) -> Integer -> Value
+exactIntPower (n,e,u) p = ExactReal (n ^ p) (e * p) (unitPow (fromIntegral p) u)
 
 -- raise a value to an exact fractional power
-exactFracPower :: (Integer,Integer) -> (Integer,Integer) -> Value
-exactFracPower (a,ae) (b,be) = ExactReal 0 0
+exactFracPower :: (Integer,Integer,AnonymousUnit) -> (Integer,Integer) -> Value
+exactFracPower (a,ae,u) (b,be) = ExactReal 0 0 u
 -- TODO: Implement this properly
 
+-- TODO: Implement conversions between different units with matching dimensions
 approxBinary :: BinOp -> Value -> Value -> ApproxResult
-approxBinary Add      (IntValue a) (IntValue b) = Right $ IntValue $ a + b
-approxBinary Subtract (IntValue a) (IntValue b) = Right $ IntValue $ a - b
-approxBinary Multiply (IntValue a) (IntValue b) = Right $ IntValue $ a * b
-approxBinary Divide   (IntValue a) (IntValue b) = if (mod a b) == 0
-    then Right $ IntValue (div a b)
-    else approxBinary Divide (ExactReal a 0) (ExactReal b 0)
-approxBinary Power    (IntValue a) (IntValue b) = Right $ IntValue $ a ^ b
-approxBinary Add      (ExactReal a ae) (ExactReal b be) = case compare ae be of
-        EQ -> Right $ ExactReal (a+b) ae
-        LT -> approxBinary Add (ExactReal a ae) (ExactReal (b*(be-ae)) ae)
-        GT -> approxBinary Add (ExactReal (a*(ae-be)) be) (ExactReal b be)
-approxBinary Subtract (ExactReal a ae) (ExactReal b be) = case compare ae be of
-        EQ -> Right $ ExactReal (a-b) ae
-        LT -> approxBinary Add (ExactReal a ae) (ExactReal (b*(be-ae)) ae)
-        GT -> approxBinary Add (ExactReal (a*(ae-be)) be) (ExactReal b be)
-approxBinary Multiply (ExactReal a ae) (ExactReal b be) = Right $
-    ExactReal (a*b) (ae+be)
-approxBinary Divide   (ExactReal a ae) (ExactReal b be) = Right $
-    ExactReal (a*(10^30) `div` b) (ae-be-30) -- fix precision here
-approxBinary Power    l@(ExactReal a ae) r@(ExactReal b be) = approxBinary
-    Multiply
-    (exactIntPower (a,ae) $ ipartExact (b,be))
-    (exactFracPower (a,ae) $ fpartExact (b,be))
-approxBinary o (IntValue n) e@(ExactReal _ _) = approxBinary o (ExactReal n 0) e
+approxBinary Add      l@(IntValue a u) r@(IntValue b u') = if isCompat l r
+    then Right $ IntValue (a + b) u
+    else Left $ UnitsError u u'
+approxBinary Subtract l@(IntValue a u) r@(IntValue b u') = if isCompat l r
+    then Right $ IntValue (a - b) u
+    else Left $ UnitsError u u'
+approxBinary Multiply (IntValue a u) (IntValue b u') =
+    Right $ IntValue (a * b) (u >* u')
+approxBinary Divide   (IntValue a u) (IntValue b u') = if (mod a b) == 0
+    then Right $ IntValue (div a b) (u >/ u')
+    else approxBinary Divide (ExactReal a 0 u) (ExactReal b 0 u')
+approxBinary Power  l@(IntValue a u) r@(IntValue b u') =
+    if (dimension r) == Dimensionless then Right $ IntValue (a ^ b) u
+                                      else Left $ UnitPowerError u'
+approxBinary Add    l@(ExactReal a ae u) r@(ExactReal b be u') = if isCompat l r
+    then case compare ae be of
+        EQ -> Right $ ExactReal (a+b) ae u
+        LT -> approxBinary Add (ExactReal a ae u) (ExactReal (b*(be-ae)) ae u')
+        GT -> approxBinary Add (ExactReal (a*(ae-be)) be u) (ExactReal b be u')
+    else Left $ UnitsError u u'
+approxBinary Subtract (ExactReal a ae u) (ExactReal b be u') = if isCompat u u'
+    then case compare ae be of
+        EQ -> Right $ ExactReal (a-b) ae u
+        LT -> approxBinary Add (ExactReal a ae u) (ExactReal (b*(be-ae)) ae u')
+        GT -> approxBinary Add (ExactReal (a*(ae-be)) be u) (ExactReal b be u')
+    else Left $ UnitsError u u'
+approxBinary Multiply (ExactReal a ae u) (ExactReal b be u') = Right $
+    ExactReal (a*b) (ae+be) (u >* u')
+approxBinary Divide   (ExactReal a ae u) (ExactReal b be u') = Right $
+    ExactReal (a*(10^30) `div` b) (ae-be-30) (u >/ u') -- fix precision here
+approxBinary Power    l@(ExactReal a ae u) r@(ExactReal b be u') =
+    if dimension u' /= Dimensionless then
+        approxBinary Multiply
+            (exactIntPower (a,ae,u) $ ipartExact (b,be))
+            (exactFracPower (a,ae,u) $ fpartExact (b,be))
+    else Left $ UnitPowerError u'
+approxBinary o (IntValue n u) e@(ExactReal _ _ _) =
+    approxBinary o (ExactReal n 0 u) e
 
 approx :: Expr -> ApproxResult
 approx (BinaryExpr op a b) = approx a >>= (\a->approx b >>= (approxBinary op a))

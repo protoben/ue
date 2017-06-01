@@ -35,10 +35,12 @@ replDo (Evaluate ShowReductions e) = do
 replDo (Evaluate AvoidExpansion e) = printExpr $ simplify e
 replDo (Evaluate Verbatim e) = printExpr e
 replDo (Evaluate Numeric e) = liftM simplify (substFuncs e >>= substVars) >>=
-    (\e->if containsSymbols e
-         then liftIO $ putStrLn "Failed: expression is not concrete"
+    (\e->liftIO $ if containsSymbols e
+         then putStrLn "Failed: expression is not concrete"
          else case (approx e) of
-            Left err -> liftIO $ print err
+            Left (UnitsError u v) -> putStrLn $ concat ["Incompatible units: ",
+                displayUnit u, " vs ", displayUnit v]
+            Left err -> print err
             Right v  -> liftIO $ putStrLn $ display $ Constant v)
 replDo (VarBind n e) = bindVar n e
 replDo Help = return ()

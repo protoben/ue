@@ -137,6 +137,7 @@ renderUnit us = intercalate "*" $ map showPiece us where
         | p < 0  = showUnit u ++ "^(" ++ show p ++ ")"
         | p == 1 = showUnit u
         | p > 1  = showUnit u ++ "^" ++ show p
+        | otherwise = show (u,p)
 
     showUnit :: NamedUnit -> String
     showUnit (Base (BaseUnit a _ _)) = a

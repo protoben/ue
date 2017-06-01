@@ -34,6 +34,7 @@ data BaseUnit = BaseUnit Abbrev Fullname BaseDimension deriving (Show,Eq,Ord)
 data DerivedUnit = DerivedUnit Abbrev Fullname
     [(Rational,BaseUnit)] [(Rational,BaseUnit)] deriving (Eq,Show)
 
+-- |Typeclass for everything that has a dimension
 class Dimensioned a where
     dimension :: a -> Dimension
 
@@ -65,6 +66,7 @@ data UnitSystem = UnitSystem {
 -- anonymous unit type used when evaluating expressions
 newtype AnonymousUnit = AnonymousUnit
     ([(Rational,BaseUnit)],[(Rational,BaseUnit)]) deriving Show
+
 class Unit a where
     toFrac :: a -> AnonymousUnit
 
@@ -90,6 +92,10 @@ instance Unit AnonymousUnit where
 inv :: (Unit a) => a -> AnonymousUnit
 inv = (\(AnonymousUnit (a,b))->(AnonymousUnit (b,a))) . toFrac
 
+unitPow :: (Unit a) => Int -> a -> AnonymousUnit
+unitPow n u = let (AnonymousUnit (t,b)) = toFrac u in
+    reduceUnit $ AnonymousUnit (concat $ replicate n t,concat $ replicate n b)
+
 reduceUnit :: Unit a => a -> AnonymousUnit
 reduceUnit u = reducer (sortFactors ts) (sortFactors bs) where
     (AnonymousUnit (ts,bs)) = toFrac u
@@ -98,6 +104,9 @@ reduceUnit u = reducer (sortFactors ts) (sortFactors bs) where
     reducer [] ys = AnonymousUnit ([],ys)
     reducer (x:xs) ys = if elem x ys then reducer xs (delete x ys) else
         let (AnonymousUnit (ts,bs)) = reducer xs ys in AnonymousUnit (x:ts,bs)
+
+noUnit :: AnonymousUnit
+noUnit = AnonymousUnit ([],[])
 
 -- all units are dimensioned
 instance Dimensioned AnonymousUnit where

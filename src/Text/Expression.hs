@@ -1,6 +1,7 @@
 module Text.Expression (expr, readExpr, funcCall) where
 
 import Data.Expression
+import Data.Units
 
 import Text.Units
 import Text.Parsec
@@ -20,30 +21,39 @@ name :: Parser String
 name = inSpace $ liftM2 (:) (letter <|> char '_') (many $ alphaNum <|> char '_')
 
 -- constant value parsing
-value :: Parser Value
-value = inSpace (vector <|> try number) where
-    vector = liftM vectorPost $ between
-        (symbol "<") (symbol ">") (sepBy number (symbol ","))
-
-    vectorPost (x:y:[]) = Vec2 x y
-    vectorPost xs = VecN xs
-
-    number = (try scientific) <|> (try decimal) <|> integer
+scalarValue :: Parser Value
+scalarValue = inSpace $ numericPart >>= (inSpace . addUnit) where
+    numericPart = (try scientific) <|> (try decimal) <|> integer
     scientific = do
-        (ExactReal decDigits decExp) <- try decimal <|>
-            liftM (\(IntValue x)->ExactReal x 0) integer
+        (ExactReal decDigits decExp _) <- try decimal <|>
+            liftM (\(IntValue x u)->ExactReal x 0 u) integer
         oneOf "eE"
-        (IntValue exponent) <- integer
-        return $ ExactReal decDigits (decExp + exponent)
+        (IntValue exponent _) <- integer
+        return $ ExactReal decDigits (decExp + exponent) noUnit
     decimal = do
         ipart <- many digit
         char '.'
         fpart <- many1 digit
-        return $ ExactReal (read $ ipart ++ fpart) (-(fromIntegral $ length fpart))
+        return $ ExactReal
+            (read $ ipart ++ fpart)
+            (-(fromIntegral $ length fpart))
+            noUnit
     integer = do
         sign <- (string "+" >> return "") <|> string "-" <|> return ""
         digs <- many1 digit
-        return $ IntValue $ read (sign ++ digs)
+        return $ IntValue (read (sign ++ digs)) noUnit
+
+    -- parse and add a unit to a dimensionless quantity
+    addUnit :: Value -> Parser Value
+    addUnit v = (liftM (\u->forceUnit u v) $ try unit) <|> (return v)
+
+value :: Parser Value
+value = inSpace (vector <|> try scalarValue) where
+    vector = liftM vectorPost $ between
+        (symbol "<") (symbol ">") (sepBy scalarValue (symbol ","))
+
+    vectorPost (x:y:[]) = Vec2 x y
+    vectorPost xs = VecN xs
 
 -- expression parsing
 funcCall :: Parser Expr
