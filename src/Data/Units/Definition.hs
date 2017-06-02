@@ -5,13 +5,18 @@ import Data.Units.Types
 import Control.Monad.Trans.Writer.Lazy
 
 -- utilities for building units
-type UnitM = Writer [DerivedUnit]
+type IsAtomic = Bool
+type UnitM = Writer [(IsAtomic,DerivedUnit)]
 
 unit :: String -> String -> AnonymousUnit -> UnitM DerivedUnit
-unit abbrev name def = tell [r] >> return r
+unit abbrev name def = tell [(False,r)] >> return r
     where
         r = uncurry (DerivedUnit abbrev name) tup
         (AnonymousUnit tup) = def
+
+-- make all definitions from the subexpression atomic
+atomic :: UnitM a -> UnitM a
+atomic = censor (map (\(_,b)->(True,b)))
 
 prefixes :: [(String,String,Rational)]
 prefixes = [
@@ -55,5 +60,10 @@ siPrefixedBase u = siPrefixesBase u
 
 -- construct derived unit system
 system :: [BaseUnit] -> UnitM a -> UnitSystem
-system b w = let derived = snd $ runWriter w in UnitSystem {
-    baseUnits = b, derivedUnits = derived }
+system b w = UnitSystem {
+        baseUnits = b,
+        atomicUnits = atomic,
+        derivedUnits = derived } where
+    res = snd $ runWriter w
+    derived = map snd $ filter (not . fst) $ res
+    atomic = map snd $ filter fst $ res

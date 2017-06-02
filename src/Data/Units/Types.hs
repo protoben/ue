@@ -61,6 +61,7 @@ multiplyDims (Dimension ts bs) (Dimension ts' bs') = reduceDim $
 -- a consistent system of units
 data UnitSystem = UnitSystem {
     baseUnits :: [BaseUnit],
+    atomicUnits :: [DerivedUnit], -- units that can't form compound units
     derivedUnits :: [DerivedUnit] } deriving Show
 
 -- anonymous unit type used when evaluating expressions

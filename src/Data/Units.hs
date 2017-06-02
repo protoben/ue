@@ -22,10 +22,13 @@ systems = [mks]
 findBaseUnit :: (Rational, BaseUnit) -> Maybe BaseUnit
 findBaseUnit (n,u) = if n /= 1 then Nothing else Just u
 
+findAtomicUnit :: AnonymousUnit -> Maybe DerivedUnit
+findAtomicUnit (AnonymousUnit tb) = listToMaybe results where
+    results = catMaybes $ map findInSystem systems
+    findInSystem = find (\(DerivedUnit _ _ ts bs)->(ts,bs)==tb) . atomicUnits
+
 findDerivedUnit :: AnonymousUnit -> Maybe DerivedUnit
-findDerivedUnit (AnonymousUnit tb) = (case results of
-    [] -> Nothing
-    (x:_) -> Just x) where
+findDerivedUnit (AnonymousUnit tb) = listToMaybe results where
         results = catMaybes $ map findInSystem systems
         findInSystem s = find (\(DerivedUnit _ _ ts bs)->(ts,bs)==tb) $
             derivedUnits s
@@ -144,4 +147,6 @@ renderUnit us = intercalate "*" $ map showPiece us where
     showUnit (Derived (DerivedUnit a _ _ _)) = a
 
 displayUnit :: Unit a => a -> String
-displayUnit = renderUnit . decomposeUnit . decompose
+displayUnit u = case findAtomicUnit $ toFrac u of
+    Nothing -> renderUnit $ decomposeUnit $ decompose u
+    Just (DerivedUnit a n _ _) -> a

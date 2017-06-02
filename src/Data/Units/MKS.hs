@@ -19,7 +19,7 @@ mks = system [kg,m,cd,s,k,a] $ do
     siPrefixesBase s
     siPrefixesBase k
     siPrefixesBase a
-    --hz <- siPrefixed $ unit "Hz" "hertz"  $ inv s
+    hz <- atomic $ siPrefixed $ unit "Hz" "hertz"  $ inv s
     n  <- siPrefixed $ unit "N"  "newton" $ (kg >* m) >/ (s >* s)
     pa <- siPrefixed $ unit "Pa" "pascal" $ n >/ (m >* m)
     j  <- siPrefixed $ unit "J"  "joule"  $ n >* m
