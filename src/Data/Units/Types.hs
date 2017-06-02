@@ -80,12 +80,12 @@ instance Unit AnonymousUnit where
     toFrac x = x
 
 (>*) :: (Unit a, Unit b) => a -> b -> AnonymousUnit
-(>*) a b = AnonymousUnit (aTop ++ bTop, aBot ++ bBot) where
+(>*) a b = reduceUnit $ AnonymousUnit (aTop ++ bTop, aBot ++ bBot) where
     (AnonymousUnit (aTop,aBot)) = toFrac a
     (AnonymousUnit (bTop,bBot)) = toFrac b
 
 (>/) :: (Unit a, Unit b) => a -> b -> AnonymousUnit
-(>/) a b = AnonymousUnit (aTop ++ bBot, aBot ++ bTop) where
+(>/) a b = reduceUnit $ AnonymousUnit (aTop ++ bBot, aBot ++ bTop) where
     (AnonymousUnit (aTop,aBot)) = toFrac a
     (AnonymousUnit (bTop,bBot)) = toFrac b
 

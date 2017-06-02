@@ -14,7 +14,12 @@ a = BaseUnit "A" "Ampere" Current
 -- the system itself
 mks :: UnitSystem
 mks = system [kg,m,cd,s,k,a] $ do
-    hz <- siPrefixed $ unit "Hz" "hertz"  $ inv s
+    siPrefixesBase m
+    siPrefixesBase cd
+    siPrefixesBase s
+    siPrefixesBase k
+    siPrefixesBase a
+    --hz <- siPrefixed $ unit "Hz" "hertz"  $ inv s
     n  <- siPrefixed $ unit "N"  "newton" $ (kg >* m) >/ (s >* s)
     pa <- siPrefixed $ unit "Pa" "pascal" $ n >/ (m >* m)
     j  <- siPrefixed $ unit "J"  "joule"  $ n >* m
