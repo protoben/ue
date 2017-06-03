@@ -9,7 +9,7 @@ import Text.Parsec.String
 import Control.Monad
 
 data EvalMode = Numeric | Symbolic | AvoidExpansion | Verbatim
-    | Normal | ShowReductions deriving Show
+    | Normal | ShowReductions | TypeQuery | DebugDump deriving Show
 
 data REPLCommand = VarBind String Expr |
     FuncBind String [String] Expr |
@@ -33,11 +33,13 @@ funcBind = char '^' >> return Help
 -- main parser
 replCommand :: Parser REPLCommand
 replCommand = spaces >> (choice $ map try [
-    char '!' >> liftM (Evaluate Numeric) expr,
-    char '"' >> liftM (Evaluate Verbatim) expr,
-    char '`' >> liftM (Evaluate AvoidExpansion) expr,
-    char '\\' >> liftM (Evaluate ShowReductions) expr,
-    char '\'' >> liftM (Evaluate Symbolic) expr,
+    char ',' >> spaces >> liftM (Evaluate DebugDump) expr,
+    char '!' >> spaces >> liftM (Evaluate Numeric) expr,
+    char '"' >> spaces >> liftM (Evaluate Verbatim) expr,
+    char '`' >> spaces >> liftM (Evaluate AvoidExpansion) expr,
+    char '\\' >> spaces >> liftM (Evaluate ShowReductions) expr,
+    char '\'' >> spaces >> liftM (Evaluate Symbolic) expr,
+    string "!?" >> spaces >> liftM (Evaluate TypeQuery) expr,
     liftM2 VarBind (inSpace name) $ symbol ":=" >> expr,
     funcBind,
     ((void $ char '?') <|> symbol "help") >> return Help,

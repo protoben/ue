@@ -22,6 +22,7 @@ instance Eq Dimension where
 reduceDim :: Dimension -> Dimension
 reduceDim Dimensionless = Dimensionless
 reduceDim (Dimension ts bs) = reducer (sort ts) (sort bs) where
+    reducer [] [] = Dimensionless
     reducer [] ys = Dimension [] ys
     reducer (x:xs) ys = if elem x ys
         then reducer xs (delete x ys)
@@ -47,9 +48,11 @@ instance Dimensioned DerivedUnit where
             onBoth :: (a -> b) -> (a,a) -> (b,b)
             onBoth f (x,y) = (f x, f y)
             dimensions :: [(Rational,BaseUnit)] -> [Dimension]
-            dimensions = filter (\x->not $ x == Dimensionless) . map (dimension . snd)
-            (tts,tbs) = onBoth concat $ unzip $ map (\(Dimension t b)->(t,b)) $ dimensions ts
-            (bts,bbs) = onBoth concat $ unzip $ map (\(Dimension t b)->(t,b)) $ dimensions bs
+            dimensions = filter (\x->not $ x == Dimensionless) .
+                map (dimension . snd)
+            joinFrac = onBoth concat . unzip . map (\(Dimension t b)->(t,b))
+            (tts,tbs) = joinFrac $ dimensions ts
+            (bts,bbs) = joinFrac $ dimensions bs
 
 isCompat :: (Dimensioned a, Dimensioned b) => a -> b -> Bool
 isCompat a b = (dimension a) == (dimension b)
@@ -111,6 +114,7 @@ noUnit = AnonymousUnit ([],[])
 
 -- all units are dimensioned
 instance Dimensioned AnonymousUnit where
+    dimension (AnonymousUnit ([],[])) = Dimensionless
     dimension (AnonymousUnit (t,b)) = Dimension dt db where
         dimify :: (Rational,BaseUnit) -> BaseDimension
         dimify = (\(BaseUnit _ _ x)->x) . snd
