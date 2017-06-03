@@ -43,7 +43,9 @@ approximate :: (Monad m) => Expr -> ReplT m (Maybe Expr)
 approximate e = return Nothing
 
 runReplT :: (Monad m) => ReplT m a -> m a
-runReplT m = E.evalEnvT E.emptyEnv $ evalStateT m defaultContext
+runReplT m = E.evalEnvT E.emptyEnv $ do
+    setupEnvironment
+    evalStateT m defaultContext
 
 -- below here are just operations which re-export Env operations in Repl
 
@@ -56,10 +58,10 @@ substVars = lift . E.substVars
 bindVar :: (Monad m) => String -> Expr -> ReplT m ()
 bindVar s e = lift $ E.bindVar s e
 
-bindFunc :: (Monad m) => String -> Function -> ReplT m ()
+bindFunc :: (Monad m) => String -> E.Function -> ReplT m ()
 bindFunc s f = lift $ E.bindFunc s f
 
-withBindings :: (Monad m) => [(String, Expr)] -> [(String, Function)] -> ReplT m a -> ReplT m a
+withBindings :: (Monad m) => [(String, Expr)] -> [(String, E.Function)] -> ReplT m a -> ReplT m a
 withBindings v f m = do
     ctx <- get
     -- run the argument with modified bindings

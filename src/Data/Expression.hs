@@ -1,9 +1,13 @@
-module Data.Expression (Expr(..), Value(..), BinOp(..), UnaryOp(..), Relation(..),
-    containsSymbols, display, treeDepth, subst, substVar, forceUnit) where
+module Data.Expression (
+    Expr(..), Value(..), BinOp(..), UnaryOp(..), Relation(..),
+    containsSymbols, allSymbols,
+    display, treeDepth, substM, subst, substVar, forceUnit) where
 
 import Data.List
 import Data.Maybe
 import Data.Units
+
+import Control.Monad
 
 data BinOp = Add | Subtract | Multiply | Divide | Power deriving (Show,Eq)
 data UnaryOp = Negate deriving (Show, Eq)
@@ -46,6 +50,7 @@ data Expr =
     Constant Value
     deriving (Show,Eq)
 
+-- List whether an expression contains unbound symbols
 containsSymbols :: Expr -> Bool
 containsSymbols (NameRef _) = True
 containsSymbols (FuncCall _ _) = True
@@ -53,6 +58,15 @@ containsSymbols (Constant _) = False
 containsSymbols (UnaryExpr _ e) = containsSymbols e
 containsSymbols (BinaryExpr _ a b) = containsSymbols a || containsSymbols b
 containsSymbols (RelationExpr _ a b) = containsSymbols a || containsSymbols b
+
+-- Get a list of all unbound symbols
+allSymbols :: Expr -> [Name]
+allSymbols (NameRef n) = [n]
+allSymbols (FuncCall _ _) = []
+allSymbols (Constant _) = []
+allSymbols (UnaryExpr _ e) = allSymbols e
+allSymbols (BinaryExpr _ l r) = allSymbols l ++ allSymbols r
+allSymbols (RelationExpr _ l r) = allSymbols l ++ allSymbols r
 
 displayVal :: Value -> String
 displayVal (IntValue i u) = show i ++ displayUnit u
@@ -112,19 +126,29 @@ treeDepth (FuncCall _ xs) = 1 + (foldl' max 0 $ map treeDepth xs)
 treeDepth (NameRef _) = 1
 treeDepth (Constant _) = 1
 
+fromMaybeM :: (Monad m) => m (Maybe b) -> m b -> m b
+fromMaybeM a b = a >>= (\x->case x of
+    Nothing -> b
+    Just r  -> return r)
+
 -- Perform a substitution over each element in the tree. The results from the
 -- substitution function are not themselves substituted, to prevent infinite
 -- recursion. When the substitution function returns Nothing, the passed element
 -- will not be modified.
+substM :: Monad m => (Expr -> m (Maybe Expr)) -> Expr -> m Expr
+substM f x@(RelationExpr rel l r) = fromMaybeM (f x) $
+    liftM2 (RelationExpr rel) (substM f l) (substM f r)
+substM f x@(BinaryExpr op l r) = fromMaybeM (f x) $
+    liftM2 (BinaryExpr op) (substM f l) (substM f r)
+substM f x@(UnaryExpr op e) = fromMaybeM (f x) $
+    liftM (UnaryExpr op) (substM f e)
+substM f x@(FuncCall n es) = fromMaybeM (f x) $ liftM (FuncCall n) $
+    mapM (substM f) es
+substM f x@(NameRef n) = fromMaybeM (f x) $ return x
+substM f x@(Constant v) = fromMaybeM (f x) $ return x
+
 subst :: (Expr -> Maybe Expr) -> Expr -> Expr
-subst f x@(RelationExpr rel l r) =
-    fromMaybe (RelationExpr rel (subst f l) (subst f r)) $ f x
-subst f x@(BinaryExpr op l r) =
-    fromMaybe (BinaryExpr op (subst f l) (subst f r)) $ f x
-subst f x@(UnaryExpr op e) = fromMaybe (UnaryExpr op $ subst f e) $ f x
-subst f x@(FuncCall n es) = fromMaybe (FuncCall n $ map (subst f) es) $ f x
-subst f x@(NameRef n) = fromMaybe x $ f x
-subst f x@(Constant v) = fromMaybe x $ f x
+subst f = head . substM (return . f)
 
 -- Utility function for substituting a single variable
 substVar :: String -> Expr -> Expr -> Expr
