@@ -52,6 +52,7 @@ containsSymbols (FuncCall _ _) = True
 containsSymbols (Constant _) = False
 containsSymbols (UnaryExpr _ e) = containsSymbols e
 containsSymbols (BinaryExpr _ a b) = containsSymbols a || containsSymbols b
+containsSymbols (RelationExpr _ a b) = containsSymbols a || containsSymbols b
 
 displayVal :: Value -> String
 displayVal (IntValue i u) = show i ++ displayUnit u

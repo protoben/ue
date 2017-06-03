@@ -77,7 +77,8 @@ rewriteRules =
     (a =+ b=*a, (b =+ csti 1) =* a), (a =+ a=*b, (b =+ csti 1) =* a),
     (a =- b=*a, (b =- csti 1) =* a), (a =- a=*b, (b =- csti 1) =* a),
     ((neg a) =+ b=*a, (b =- csti 1) =* a), ((neg a) =+ a=*b, (b =- csti 1) =* a),
-    (a=*b =+ a=*c, a =* (b =+ c)), (b=*a =+ c=*a, a =* (b =+ c)), -- factoring out coefficients
+    -- factoring out coefficients
+    (a=*b =+ a=*c, a =* (b =+ c)), (b=*a =+ c=*a, a =* (b =+ c)),
     (a =- (b =+ c), a =+ (neg b =+ neg c)), -- distribute subtraction
     (a =- (b =- c), a =+ (neg b =+ c)), -- distribute subtraction
     ((a =+ b=*c) =+ d=*c, (a =+ c=*(b =+ d))),
@@ -112,7 +113,11 @@ rewriteRules =
     (a =+ b =: c =+ b, a =: c), (b =+ a =: c =+ b, a =: c), -- subtract both sides
     (a =+ b =: b =+ c, a =: c), (b =+ a =: b =+ c, a =: c), -- subtract both sides
     (a =+ b =: m =* b, a =: b =* (m =- csti 1)),  -- subtract from multiplication
-    (a =+ b =: m =* a, b =: a =* (m =- csti 1))
+    (a =+ b =: m =* a, b =: a =* (m =- csti 1)),
+
+    -- solve simple algebra
+    (n =* a =: m, a =: m =/ n), (n =/ a =: m, a =: m =* n),
+    (n =+ a =: m, a =: m =- n), (a =- n =: m, a =: m =+ n)
     ]
     where
         cst :: Value -> RRExpr
