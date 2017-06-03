@@ -35,13 +35,12 @@ replDo (Evaluate ShowReductions e) = do
 replDo (Evaluate AvoidExpansion e) = printExpr $ simplify e
 replDo (Evaluate Verbatim e) = printExpr e
 replDo (Evaluate Numeric e) = liftM simplify (substFuncs e >>= substVars) >>=
-    (\e->liftIO $ if containsSymbols e
-         then putStrLn "Failed: expression is not concrete"
-         else case (approx e) of
-            Left (UnitsError u v) -> putStrLn $ concat ["Incompatible units: ",
-                displayUnit u, " vs ", displayUnit v]
-            Left err -> print err
-            Right v  -> putStrLn $ display $ Constant v)
+    (\e->liftIO $ case (approx e) of
+        Left (UnitsError u v) -> putStrLn $ concat ["Incompatible units: ",
+            displayUnit u, " vs ", displayUnit v]
+        Left NotConcrete -> putStrLn "Failed: expression is not concrete"
+        Left err -> print err
+        Right v  -> putStrLn $ display v)
 replDo (Evaluate TypeQuery e) = liftM simplify (substFuncs e >>= substVars) >>=
     (\e->liftIO $ if containsSymbols e
          then putStrLn "Failed: expression is not concrete"
@@ -49,7 +48,8 @@ replDo (Evaluate TypeQuery e) = liftM simplify (substFuncs e >>= substVars) >>=
             Left (UnitsError u v) -> putStrLn $ concat ["Incompatible units: ",
                 displayUnit u, " vs ", displayUnit v]
             Left err -> print err
-            Right v  -> print $ dimension v)
+            Right (Constant v) -> print $ dimension v
+            Right _ -> putStrLn "Cannot get type of non-value expression")
 replDo (Evaluate DebugDump e) = liftIO $ print e
 replDo (VarBind n e) = bindVar n e
 replDo Help = return ()

@@ -1,4 +1,4 @@
-module Math.Approximate where
+module Math.Approximate (approx, ApproxError(..)) where
 
 import Data.Expression
 import Data.Units
@@ -13,7 +13,8 @@ data ApproxMode =
 
 data ApproxError = TypeError |
     UnitsError AnonymousUnit AnonymousUnit |
-    UnitPowerError AnonymousUnit
+    UnitPowerError AnonymousUnit |
+    NotConcrete
     deriving Show
 
 type ApproxResult = Either ApproxError Value
@@ -89,7 +90,16 @@ approxBinary Power    l@(ExactReal a ae u) r@(ExactReal b be u') =
 approxBinary o (IntValue n u) e@(ExactReal _ _ _) =
     approxBinary o (ExactReal n 0 u) e
 
-approx :: Expr -> ApproxResult
-approx (BinaryExpr op a b) = approx a >>= (\a->approx b >>= (approxBinary op a))
-approx (UnaryExpr Negate a) = flipSign <$> approx a
-approx (Constant v) = Right v
+approx :: Expr -> Either ApproxError Expr
+approx (RelationExpr op a b) = case (approx a, approx b) of
+    (Right l, Right r) -> Right $ RelationExpr op l r
+    (Left _,  Right r) -> Right $ RelationExpr op a r
+    (Right l, Left _)  -> Right $ RelationExpr op l b
+    (Left le, Left re) -> Left le
+approx e = if containsSymbols e then Left NotConcrete
+                                else Constant <$> approx' e where
+    approx' :: Expr -> ApproxResult
+    approx' (BinaryExpr op a b) =
+        approx' a >>= (\a->approx' b >>= (approxBinary op a))
+    approx' (UnaryExpr Negate a) = flipSign <$> approx' a
+    approx' (Constant v) = Right v
