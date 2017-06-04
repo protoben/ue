@@ -1,4 +1,4 @@
-module Text.Expression (expr, readExpr, funcCall) where
+module Text.Expression (expr, exprExtended, readExpr, funcCall) where
 
 import Data.Expression
 import Data.Units
@@ -20,7 +20,7 @@ symbol :: Monad m => String -> CParserT m ()
 symbol s = (inSpace $ string s) >> return ()
 
 name :: Monad m => CParserT m String
-name = inSpace $ liftM2 (:) (letter <|> char '_') (many $ alphaNum <|> char '_')
+name = inSpace $ liftM2 (:) letter (many $ alphaNum <|> char '_')
 
 -- constant value parsing
 scalarValue :: Monad m => CParserT m Value
@@ -63,14 +63,15 @@ funcCall = try $ liftM2 FuncCall name (between
     (symbol "(") (symbol ")")
     (sepBy expr (symbol ",")))
 
-term :: Monad m => CParserT m Expr
-term = parenthesized <|> funcCall <|> nameRef <|> (liftM Constant value)
+term :: Monad m => [CParserT m Expr] -> CParserT m Expr
+term more = parenthesized <|> funcCall <|> nameRef <|> (liftM Constant value)
+        <|> choice more
     where
-        parenthesized = between (symbol "(") (symbol ")") mathExpr
+        parenthesized = between (symbol "(") (symbol ")") (mathExpr more)
         nameRef = liftM NameRef name
 
-mathExpr :: Monad m => CParserT m Expr
-mathExpr = buildExpressionParser exprTable term
+mathExpr :: Monad m => [CParserT m Expr] -> CParserT m Expr
+mathExpr terms = buildExpressionParser exprTable (term terms)
     where
         exprTable = [
             [prefix "-" Negate],
@@ -80,20 +81,23 @@ mathExpr = buildExpressionParser exprTable term
         prefix c o = Prefix $ symbol c >> (return $ UnaryExpr o)
         binary c o a = Infix (symbol c >> (return $ BinaryExpr o)) a
 
-expr :: Monad m => CParserT m Expr
-expr = (try relation) <|> mathExpr
+-- expression parser which allows custom term parsers
+exprExtended :: Monad m => [CParserT m Expr] -> CParserT m Expr
+exprExtended terms = (try relation) <|> (mathExpr terms)
     where
         relation = do
-            l <- mathExpr
+            l <- mathExpr terms
             op <- choice [
                     try (symbol "=" >> return Equal),
                     try (symbol "<=" >> return Lesser),
                     try (symbol ">=" >> return Greater),
                     try (symbol "<" >> return Lesser),
                     try (symbol ">" >> return Greater)]
-            r <- mathExpr
-
+            r <- mathExpr terms
             return $ RelationExpr op l r
+
+expr :: Monad m => CParserT m Expr
+expr = exprExtended []
 
 readExpr :: IO (Either ParseError Expr)
 readExpr = liftM (parse expr "cmd") getLine

@@ -18,22 +18,24 @@ data REPLCommand = VarBind String Expr |
     VarUnbind String | FuncUnbind String |
     Help | Evaluate EvalMode Expr | NoAction deriving Show
 
+type CParserT = ParsecT String ()
+
 -- utility functions
-inSpace :: Parser a -> Parser a
+inSpace :: Monad m => CParserT m a -> CParserT m a
 inSpace p = spaces >> p >>= (\r->spaces >> return r)
 
-symbol :: String -> Parser ()
+symbol :: Monad m => String -> CParserT m ()
 symbol s = (inSpace $ string s) >> return ()
 
-name :: Parser String
-name = inSpace $ liftM2 (:) (letter <|> char '_') (many $ alphaNum <|> char '_')
+name :: Monad m => CParserT m String
+name = inSpace $ liftM2 (:) letter (many $ alphaNum <|> char '_')
 
 -- internal parsers
-funcBind :: Parser REPLCommand
+funcBind :: Monad m => CParserT m REPLCommand
 funcBind = char '^' >> return Help
 
 -- main parser
-replCommand :: Parser REPLCommand
+replCommand :: Monad m => CParserT m REPLCommand
 replCommand = spaces >> (choice $ map try [
     char ',' >> spaces >> liftM (Evaluate DebugDump) expr,
     char ';' >> spaces >> liftM (Evaluate ResultDump) expr,
