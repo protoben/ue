@@ -38,6 +38,10 @@ reduces n xs e = satisfy n $ all (\x->simplify x == e) xs
 csti :: Integer -> Expr
 csti = Constant . (\x->IntValue x noUnit)
 
+-- produce a constant real number
+cstf :: Integer -> Integer -> Expr
+cstf n p = Constant $ ExactReal n p noUnit
+
 -- generate a summation of the passed exprs
 sumExprs :: [Expr] -> Expr
 sumExprs [x] = x
@@ -46,10 +50,11 @@ sumExprs (x:xs) = BinaryExpr Add x $ sumExprs xs
 tests :: IO [Test]
 tests = return $ [
         Group "numerical" True [
-            Group "addition" True [
-                reduces "natural-nums"
-                    (map sumExprs $ permutations $ map csti [0..5])
-                    (csti $ sum [0..5])
-            ]
+            reduces "natural-num-add"
+                (map sumExprs $ permutations $ map csti [0..5])
+                (csti $ sum [0..5]),
+            reduces "exact-int-sum"
+                (map sumExprs $ permutations [csti 2, cstf 5 (-1)])
+                (cstf 25 (-1))
         ]
     ]
