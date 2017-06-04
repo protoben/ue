@@ -69,6 +69,7 @@ rewriteRules =
     (a =+ (b =+ neg a), b), (a =+ (neg a =+ b), b),
     (a =+ (b =+ a), b =+ a =* csti 2), (a =+ (a =+ b), b =+ a =* csti 2),
     ((b =+ a) =+ a, b =+ a =* csti 2), ((a =+ b) =+ a, b =+ a =* csti 2),
+    ((a =+ b) =- a, b), ((b =+ a) =- a, b), ((b =- a) =+ a, b),
 
     -- multiplication/division
     (a =* (b =/ a), b), ((b =/ a) =* a, b), ((a =* b) =/ a, b), ((b =* a) =/ a, b),
