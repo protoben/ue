@@ -5,7 +5,9 @@ import Data.Units
 import Math.Rewrite
 
 import Data.List
-import Test.QuickCheck
+import Control.Monad
+
+import Test.QuickCheck as Q
 import Distribution.TestSuite
 
 satisfy :: Testable p => String -> p -> Test
@@ -55,6 +57,14 @@ tests = return $ [
                 (csti $ sum [0..5]),
             reduces "exact-int-sum"
                 (map sumExprs $ permutations [csti 2, cstf 5 (-1)])
-                (cstf 25 (-1))
+                (cstf 25 (-1)),
+            rewriteTest "exact-zero-sum"
+                (fmap (sumExprs . concat) $
+                    ((listOf1 $ oneof [
+                        fmap (\x->[csti x, csti (-x)]) (choose (0, 500)),
+                        fmap (\(d,p)->[cstf d p, cstf (-d) p])
+                            (liftM2 (,) (choose (0,5000)) (choose (-50,50)))])
+                    >>= Q.shuffle))
+                (csti 0)
         ]
     ]
