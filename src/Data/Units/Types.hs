@@ -24,9 +24,10 @@ reduceDim Dimensionless = Dimensionless
 reduceDim (Dimension ts bs) = reducer (sort ts) (sort bs) where
     reducer [] [] = Dimensionless
     reducer [] ys = Dimension [] ys
-    reducer (x:xs) ys = if elem x ys
-        then reducer xs (delete x ys)
-        else let (Dimension ts bs) = reducer xs ys in Dimension (x:ts) bs
+    reducer (x:xs) ys = if elem x ys then reducer xs (delete x ys)
+                                     else case reducer xs ys of
+                                        (Dimension ts bs) -> Dimension (x:ts) bs
+                                        Dimensionless     -> Dimension [x] []
 
 -- basic unit types
 type Abbrev = String
