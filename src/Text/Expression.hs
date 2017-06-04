@@ -10,18 +10,20 @@ import Text.Parsec.Expr
 
 import Control.Monad
 
+type CParserT = ParsecT String ()
+
 -- utility functions
-inSpace :: Parser a -> Parser a
+inSpace :: Monad m => CParserT m a -> CParserT m a
 inSpace p = spaces >> p >>= (\r->spaces >> return r)
 
-symbol :: String -> Parser ()
+symbol :: Monad m => String -> CParserT m ()
 symbol s = (inSpace $ string s) >> return ()
 
-name :: Parser String
+name :: Monad m => CParserT m String
 name = inSpace $ liftM2 (:) (letter <|> char '_') (many $ alphaNum <|> char '_')
 
 -- constant value parsing
-scalarValue :: Parser Value
+scalarValue :: Monad m => CParserT m Value
 scalarValue = inSpace $ numericPart >>= (inSpace . addUnit) where
     numericPart = (try scientific) <|> (try decimal) <|> integer
     scientific = do
@@ -44,10 +46,10 @@ scalarValue = inSpace $ numericPart >>= (inSpace . addUnit) where
         return $ IntValue (read (sign ++ digs)) noUnit
 
     -- parse and add a unit to a dimensionless quantity
-    addUnit :: Value -> Parser Value
+    addUnit :: Monad m => Value -> CParserT m Value
     addUnit v = (liftM (\u->forceUnit u v) $ try unit) <|> (return v)
 
-value :: Parser Value
+value :: Monad m => CParserT m Value
 value = inSpace (vector <|> try scalarValue) where
     vector = liftM vectorPost $ between
         (symbol "<") (symbol ">") (sepBy scalarValue (symbol ","))
@@ -56,18 +58,18 @@ value = inSpace (vector <|> try scalarValue) where
     vectorPost xs = VecN xs
 
 -- expression parsing
-funcCall :: Parser Expr
+funcCall :: Monad m => CParserT m Expr
 funcCall = try $ liftM2 FuncCall name (between
     (symbol "(") (symbol ")")
     (sepBy expr (symbol ",")))
 
-term :: Parser Expr
+term :: Monad m => CParserT m Expr
 term = parenthesized <|> funcCall <|> nameRef <|> (liftM Constant value)
     where
         parenthesized = between (symbol "(") (symbol ")") mathExpr
         nameRef = liftM NameRef name
 
-mathExpr :: Parser Expr
+mathExpr :: Monad m => CParserT m Expr
 mathExpr = buildExpressionParser exprTable term
     where
         exprTable = [
@@ -78,7 +80,7 @@ mathExpr = buildExpressionParser exprTable term
         prefix c o = Prefix $ symbol c >> (return $ UnaryExpr o)
         binary c o a = Infix (symbol c >> (return $ BinaryExpr o)) a
 
-expr :: Parser Expr
+expr :: Monad m => CParserT m Expr
 expr = (try relation) <|> mathExpr
     where
         relation = do

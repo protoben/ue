@@ -8,25 +8,27 @@ import Text.Parsec.Expr
 
 import Control.Monad
 
-baseUnit :: UnitSystem -> Parser BaseUnit
+type CParserT = ParsecT String ()
+
+baseUnit :: Monad m => UnitSystem -> CParserT m BaseUnit
 baseUnit = choice . map (try . parse') . baseUnits
     where
-        parse' :: BaseUnit -> Parser BaseUnit
+        parse' :: Monad m => BaseUnit -> CParserT m BaseUnit
         parse' u@(BaseUnit a _ _) = string a >> return u
 
-derivedUnit :: UnitSystem -> Parser DerivedUnit
+derivedUnit :: Monad m => UnitSystem -> CParserT m DerivedUnit
 derivedUnit = choice . map (try . parse') . derivedUnits
     where
-        parse' :: DerivedUnit -> Parser DerivedUnit
+        parse' :: Monad m => DerivedUnit -> CParserT m DerivedUnit
         parse' u@(DerivedUnit a _ _ _) = string a >> return u
 
-atomicUnit :: UnitSystem -> Parser DerivedUnit
+atomicUnit :: Monad m => UnitSystem -> CParserT m DerivedUnit
 atomicUnit = choice . map (try . parse') . atomicUnits
     where
-        parse' :: DerivedUnit -> Parser DerivedUnit
+        parse' :: Monad m => DerivedUnit -> CParserT m DerivedUnit
         parse' u@(DerivedUnit a _ _ _) = string a >> return u
 
-systemUnit :: UnitSystem -> Parser AnonymousUnit
+systemUnit :: Monad m => UnitSystem -> CParserT m AnonymousUnit
 systemUnit sys = choice [
         liftM toFrac $ try $ derivedUnit sys,
         liftM toFrac $ try $ baseUnit sys ]
@@ -34,17 +36,17 @@ systemUnit sys = choice [
 systems = [mks]
 
 -- parse a primitive unit, not part of any unit system
-primUnit :: Parser AnonymousUnit
+primUnit :: Monad m => CParserT m AnonymousUnit
 primUnit = choice $ map (try . systemUnit) systems
 
 -- parse an atomic unit
-primAtomic :: Parser AnonymousUnit
+primAtomic :: Monad m => CParserT m AnonymousUnit
 primAtomic = liftM toFrac $ choice $ map (try . atomicUnit) systems
 
 type AU = AnonymousUnit
 
 -- parse a composite unit
-unit :: Parser AnonymousUnit
+unit :: Monad m => CParserT m AnonymousUnit
 unit = (try primAtomic) <|> (buildExpressionParser exprTable primUnit) where
     exprTable = [[lassoc '/' (>/), lassoc '*' (>*)]]
     lassoc :: Monad m => Char -> (AU -> AU -> AU) -> Operator String () m AU
