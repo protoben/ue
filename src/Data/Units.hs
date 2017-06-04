@@ -6,10 +6,12 @@ module Data.Units (
 
 import Data.Units.Types
 import Data.Units.MKS
+import Data.Display
 
 import Data.List
 import Data.Maybe
 import Data.Function
+
 import Control.Monad
 import Control.Applicative
 import Control.Arrow
@@ -150,3 +152,6 @@ displayUnit :: Unit a => a -> String
 displayUnit u = case findAtomicUnit $ toFrac u of
     Nothing -> renderUnit $ decomposeUnit $ decompose u
     Just (DerivedUnit a n _ _) -> a
+
+instance Displayable AnonymousUnit where
+    display = (\x->[(Units,x)]) . displayUnit

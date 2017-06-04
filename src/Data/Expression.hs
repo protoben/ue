@@ -6,6 +6,7 @@ module Data.Expression (
 import Data.List
 import Data.Maybe
 import Data.Units
+import Data.Display
 
 import Control.Monad
 
@@ -15,6 +16,23 @@ data Relation = Equal | Lesser | Greater | LesserEqual
     | GreaterEqual deriving (Show, Eq)
 type Name = String
 type AUnit = AnonymousUnit
+
+instance Displayable BinOp where
+    display Add      = [(Symbol, "+")]
+    display Subtract = [(Symbol, "-")]
+    display Multiply = [(Symbol, "*")]
+    display Divide   = [(Symbol, "/")]
+    display Power    = [(Symbol, "^")]
+
+instance Displayable UnaryOp where
+    display Negate = [(Symbol, "-")]
+
+instance Displayable Relation where
+    display Equal        = [(Symbol, "=")]
+    display Lesser       = [(Symbol, "<")]
+    display Greater      = [(Symbol, ">")]
+    display LesserEqual  = [(Symbol, "<=")]
+    display GreaterEqual = [(Symbol, ">=")]
 
 data Value = IntValue Integer AUnit | -- basic arbitrary-precision integer
     ExactReal Integer Integer AUnit | -- exact real D*10^P stored as (D,P) pair
@@ -27,6 +45,18 @@ instance Dimensioned Value where
     dimension (ExactReal _ _ u) = dimension u
     dimension (Vec2 _ _) = Dimensionless
     dimension (VecN _) = Dimensionless
+
+instance Displayable Value where
+    display (IntValue i u) = (Numeric,show i):(display u)
+    display (ExactReal n e u) = let s = show n in
+        ((\(a,b)->(Numeric, concat [a, ".", b])) $
+        splitAt (length s + fromIntegral e) s):(display u)
+    display (Vec2 a b) = concat [(Numeric,"<"):(display a),
+                                 (Numeric,","):(display b),
+                                 [(Numeric, ">")]]
+    display (VecN xs)  = concat [[(Numeric,"<")],
+                                 intercalate [(Numeric,",")] $ map display xs,
+                                 [(Numeric,">")]]
 
 -- |Forcibly rewrite the units of a value
 -- This function may lose information. Use with caution.
@@ -69,55 +99,40 @@ allSymbols (UnaryExpr _ e) = allSymbols e
 allSymbols (BinaryExpr _ l r) = allSymbols l ++ allSymbols r
 allSymbols (RelationExpr _ l r) = allSymbols l ++ allSymbols r
 
-displayVal :: Value -> String
-displayVal (IntValue i u) = show i ++ displayUnit u
-displayVal (ExactReal n e u) = let s = show n in
-    (\(a,b)->concat [a,".",b,displayUnit u]) $
-    splitAt (length s + fromIntegral e) s
-displayVal (Vec2 a b) = concat ["<", displayVal a, ", ", displayVal b, ">"]
-displayVal (VecN xs) = concat ["<", intercalate ", " $ map displayVal xs, ">"]
-
 data ParentType = TopLevel | AddSub | Sub | Mul | Div | PowerLeft |
     PowerRight | Unary deriving Eq
 
-pars :: [String] -> String
-pars xs = '(':(concat $ xs ++ [")"])
+pars :: [[(ContentClass,String)]] -> [(ContentClass, String)]
+pars xs = (Symbol,"("):(concat $ xs ++ [[(Symbol,")")]])
 
 -- Show an expression, properly parenthesized given the kind of expression it's
 -- contained within.
-display' :: ParentType -> Expr -> String
-display' _ (RelationExpr Equal a b) = concat
-    [display' TopLevel a, "=", display' TopLevel b]
-display' _ (RelationExpr Lesser a b) = concat
-    [display' TopLevel a, "<", display' TopLevel b]
-display' _ (RelationExpr Greater a b) = concat
-    [display' TopLevel a, ">", display' TopLevel b]
-display' _ (RelationExpr LesserEqual a b) = concat
-    [display' TopLevel a, "<=", display' TopLevel b]
-display' _ (RelationExpr GreaterEqual a b) = concat
-    [display' TopLevel a, ">=", display' TopLevel b]
+display' :: ParentType -> Expr -> [(ContentClass,String)]
+display' _ (RelationExpr o a b) =
+    concat [display' TopLevel a, display o, display' TopLevel b]
 display' p (BinaryExpr Add a b) =
     (if p `elem` [TopLevel, AddSub] then concat else pars)
-    [display' AddSub a, "+", display' AddSub b]
+    [display' AddSub a, display Add, display' AddSub b]
 display' p (BinaryExpr Subtract a b) =
     (if p `elem` [TopLevel, AddSub] then concat else pars)
-    [display' AddSub a, "-", display' Sub b]
+    [display' AddSub a, display Subtract, display' Sub b]
 display' p (BinaryExpr Multiply a b) =
     (if p `elem` [TopLevel, AddSub, Sub, Mul] then concat else pars)
-    [display' Mul a, "*", display' Mul b]
+    [display' Mul a, display Multiply, display' Mul b]
 display' p (BinaryExpr Divide a b) = concat
-    [display' Div a, "/", display' Div b]
+    [display' Div a, display Divide, display' Div b]
 display' p (BinaryExpr Power a b) = concat
-    [display' PowerLeft a, "^", display' PowerRight b]
+    [display' PowerLeft a, display Power, display' PowerRight b]
 display' p (UnaryExpr Negate a) = (if p == TopLevel then concat else pars)
-    ["-", display' Unary a]
-display' _ (FuncCall nm args) = concat
-    [nm, "(", intercalate ", " (map (display' TopLevel) args), ")"]
-display' _ (NameRef x) = x
-display' _ (Constant c) = displayVal c
+    [display Negate, display' Unary a]
+display' _ (FuncCall nm args) = concat [[(Name,nm), (Symbol,"(")],
+        intercalate [(Symbol,", ")] $ map (display' TopLevel) args,
+        [(Symbol,")")]]
+display' _ (NameRef x) = [(Variable,x)]
+display' _ (Constant c) = display c
 
-display :: Expr -> String
-display = display' TopLevel
+instance Displayable Expr where
+    display x = display' TopLevel x
 
 treeDepth :: (Num a, Ord a) => Expr -> a
 treeDepth (RelationExpr _ l r) = 1 + (max (treeDepth l) (treeDepth r))

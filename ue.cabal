@@ -35,6 +35,7 @@ test-suite symbolic-reduction
     Data.Units.MKS
     Data.Units.Definition
     Data.Units
+    Data.Display
     Math.Rewrite
     Math.Approximate
   build-depends:

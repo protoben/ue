@@ -11,7 +11,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 
-data EvalMode = Numeric | Symbolic | AvoidExpansion | Verbatim
+data EvalMode = Approximate | Symbolic | AvoidExpansion | Verbatim
     | Normal | ShowReductions | TypeQuery | DebugDump | ResultDump
     | DebugReductions
     deriving Show
@@ -48,7 +48,7 @@ replCommand :: Monad m => CParserT (ReplT m) REPLCommand
 replCommand = spaces >> (choice $ map try [
     char ',' >> spaces >> liftM (Evaluate DebugDump) replExpr,
     char ';' >> spaces >> liftM (Evaluate ResultDump) replExpr,
-    char '!' >> spaces >> liftM (Evaluate Numeric) replExpr,
+    char '!' >> spaces >> liftM (Evaluate Approximate) replExpr,
     char '"' >> spaces >> liftM (Evaluate Verbatim) replExpr,
     char '`' >> spaces >> liftM (Evaluate AvoidExpansion) replExpr,
     char '\\' >> spaces >> liftM (Evaluate ShowReductions) replExpr,
