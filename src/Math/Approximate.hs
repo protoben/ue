@@ -68,8 +68,10 @@ approxBinary Power  l@(IntValue a u) r@(IntValue b u') =
 approxBinary Add    l@(ExactReal a ae u) r@(ExactReal b be u') = if isCompat l r
     then case compare ae be of
         EQ -> Right $ ExactReal (a+b) ae u
-        LT -> approxBinary Add (ExactReal a ae u) (ExactReal (b*(be-ae)) ae u')
-        GT -> approxBinary Add (ExactReal (a*(ae-be)) be u) (ExactReal b be u')
+        LT -> approxBinary Add (ExactReal a ae u)
+                               (ExactReal (b*(10^(be-ae))) ae u')
+        GT -> approxBinary Add (ExactReal (a*(10^(ae-be))) be u)
+                               (ExactReal b be u')
     else Left $ UnitsError u u'
 approxBinary Subtract (ExactReal a ae u) (ExactReal b be u') = if isCompat u u'
     then case compare ae be of
@@ -89,6 +91,8 @@ approxBinary Power    l@(ExactReal a ae u) r@(ExactReal b be u') =
     else Left $ UnitPowerError u'
 approxBinary o (IntValue n u) e@(ExactReal _ _ _) =
     approxBinary o (ExactReal n 0 u) e
+approxBinary o e@(ExactReal _ _ _) (IntValue n u) =
+    approxBinary o e (ExactReal n 0 u)
 
 approx :: Expr -> Either ApproxError Expr
 approx (RelationExpr op a b) = case (approx a, approx b) of
