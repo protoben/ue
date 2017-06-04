@@ -65,7 +65,7 @@ funcCall = try $ liftM2 FuncCall name (between
 
 term :: Monad m => [CParserT m Expr] -> CParserT m Expr
 term more = parenthesized <|> funcCall <|> nameRef <|> (liftM Constant value)
-        <|> choice more
+        <|> choice (map try more)
     where
         parenthesized = between (symbol "(") (symbol ")") (mathExpr more)
         nameRef = liftM NameRef name

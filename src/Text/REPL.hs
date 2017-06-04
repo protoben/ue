@@ -2,11 +2,14 @@ module Text.REPL (REPLCommand(..), EvalMode(..), replCommand, readRepl) where
 
 import Text.Expression
 import Data.Expression
+import Math.REPL
 
 import Text.Parsec
 import Text.Parsec.String
 
 import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
 
 data EvalMode = Numeric | Symbolic | AvoidExpansion | Verbatim
     | Normal | ShowReductions | TypeQuery | DebugDump | ResultDump
@@ -34,24 +37,32 @@ name = inSpace $ liftM2 (:) letter (many $ alphaNum <|> char '_')
 funcBind :: Monad m => CParserT m REPLCommand
 funcBind = char '^' >> return Help
 
+replExpr :: Monad m => CParserT (ReplT m) Expr
+replExpr = exprExtended [
+        char '_' >> (lift lastResult) >>= (\x->case x of
+            Nothing -> fail "No previous result to retrieve"
+            Just r -> return r)]
+
 -- main parser
-replCommand :: Monad m => CParserT m REPLCommand
+replCommand :: Monad m => CParserT (ReplT m) REPLCommand
 replCommand = spaces >> (choice $ map try [
-    char ',' >> spaces >> liftM (Evaluate DebugDump) expr,
-    char ';' >> spaces >> liftM (Evaluate ResultDump) expr,
-    char '!' >> spaces >> liftM (Evaluate Numeric) expr,
-    char '"' >> spaces >> liftM (Evaluate Verbatim) expr,
-    char '`' >> spaces >> liftM (Evaluate AvoidExpansion) expr,
-    char '\\' >> spaces >> liftM (Evaluate ShowReductions) expr,
-    string "\\\\" >> spaces >> liftM (Evaluate DebugReductions) expr,
-    char '\'' >> spaces >> liftM (Evaluate Symbolic) expr,
-    string "!?" >> spaces >> liftM (Evaluate TypeQuery) expr,
-    liftM2 VarBind (inSpace name) $ symbol ":=" >> expr,
+    char ',' >> spaces >> liftM (Evaluate DebugDump) replExpr,
+    char ';' >> spaces >> liftM (Evaluate ResultDump) replExpr,
+    char '!' >> spaces >> liftM (Evaluate Numeric) replExpr,
+    char '"' >> spaces >> liftM (Evaluate Verbatim) replExpr,
+    char '`' >> spaces >> liftM (Evaluate AvoidExpansion) replExpr,
+    char '\\' >> spaces >> liftM (Evaluate ShowReductions) replExpr,
+    string "\\\\" >> spaces >> liftM (Evaluate DebugReductions) replExpr,
+    char '\'' >> spaces >> liftM (Evaluate Symbolic) replExpr,
+    string "!?" >> spaces >> liftM (Evaluate TypeQuery) replExpr,
+    liftM2 VarBind (inSpace name) $ symbol ":=" >> replExpr,
     funcBind,
     ((void $ char '?') <|> symbol "help") >> return Help,
-    liftM (Evaluate Normal) expr,
+    liftM (Evaluate Normal) replExpr,
     return NoAction
     ]) >>= (\x->spaces >> eof >> return x)
 
-readRepl :: IO (Either ParseError REPLCommand)
-readRepl = liftM (parse replCommand "<user>") getLine
+readRepl :: (MonadIO m) => ReplT m (Either ParseError REPLCommand)
+readRepl = do
+    l <- liftIO getLine
+    runParserT replCommand () "<repl>" l
