@@ -49,6 +49,14 @@ sumExprs :: [Expr] -> Expr
 sumExprs [x] = x
 sumExprs (x:xs) = BinaryExpr Add x $ sumExprs xs
 
+-- Generate a tree of division/multiplication operations which results in 1
+divMulTreeGen :: Gen Expr
+divMulTreeGen = oneof [return (csti 1),
+    liftM2 (\t c->BinaryExpr Divide (BinaryExpr Multiply c t) c)
+        divMulTreeGen (liftM csti $ choose (0,500)),
+    liftM2 (\t c->BinaryExpr Multiply (BinaryExpr Divide t c) c)
+        divMulTreeGen (liftM csti $ choose (0,500))]
+
 tests :: IO [Test]
 tests = return $ [
         Group "numerical" True [
@@ -65,6 +73,7 @@ tests = return $ [
                         fmap (\(d,p)->[cstf d p, cstf (-d) p])
                             (liftM2 (,) (choose (0,5000)) (choose (-50,50)))])
                     >>= Q.shuffle))
-                (csti 0)
+                (csti 0),
+            rewriteTest "exact-one-mul-div" divMulTreeGen (csti 1)
         ]
     ]
