@@ -26,6 +26,12 @@ printExpr = liftIO . putStrLn . display
 replDo :: REPLCommand -> ReplT IO ()
 replDo (Evaluate Normal e) = substFuncs e >>= substVars >>= (printExpr . simplify)
 replDo (Evaluate Symbolic e) = substFuncs e >>= substVars >>= (printExpr.simplify)
+replDo (Evaluate DebugReductions e) = do
+    a <- substFuncs e
+    b <- substVars a
+    let history = mapAccumL (\i e->(i+1, (show i) ++ ". " ++ (show e))) 1
+            (a:b:reductions b)
+    liftIO $ mapM_ putStrLn $ snd history
 replDo (Evaluate ShowReductions e) = do
     a <- substFuncs e
     b <- substVars a
@@ -51,6 +57,8 @@ replDo (Evaluate TypeQuery e) = liftM simplify (substFuncs e >>= substVars) >>=
             Right (Constant v) -> print $ dimension v
             Right _ -> putStrLn "Cannot get type of non-value expression")
 replDo (Evaluate DebugDump e) = liftIO $ print e
+replDo (Evaluate ResultDump e) = substFuncs e >>= substVars >>=
+    (liftIO . print . simplify)
 replDo (VarBind n e) = bindVar n e
 replDo Help = return ()
 replDo NoAction = return ()

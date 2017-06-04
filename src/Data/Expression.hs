@@ -39,6 +39,7 @@ forceUnit u (VecN xs) = VecN $ map (forceUnit u) xs
 -- TODO: Account for units that are multiples of each other
 instance Eq Value where
     (==) (IntValue n _) (IntValue m _) = n == m
+    (==) (ExactReal d p _) (ExactReal d' p' _) = (d == d') && (p == p')
     (==) _ _ = False
 
 data Expr =

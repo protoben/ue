@@ -6,6 +6,8 @@ import Data.Function
 import Data.Expression
 import Data.Units
 
+import Math.Approximate
+
 import Control.Monad
 import Control.Applicative
 
@@ -232,21 +234,18 @@ reorderLikeTerms e@(BinaryExpr Add a b) = expandSum $ map expandSum $ sortExprGr
 reorderLikeTerms e@(BinaryExpr Multiply a b) = expandProd $ map expandProd $ sortExprGroups $ equalGroup $ collapseProd e
 reorderLikeTerms e = e
 
+maybeEither :: Either a b -> Maybe b
+maybeEither (Left _) = Nothing
+maybeEither (Right r) = Just r
+
 -- Simplify integer arithmetic expressions
 simplifyArithmetic :: Reduction
-simplifyArithmetic (BinaryExpr Add (Constant (IntValue a u))
-                                   (Constant (IntValue b v))) =
-                                   if isCompat u v
-                                   then Just $ Constant $ IntValue (a+b) u
-                                   else Nothing
-simplifyArithmetic (BinaryExpr Subtract (Constant (IntValue a u))
-                                        (Constant (IntValue b v))) =
-                                        if isCompat u v
-                                        then Just $ Constant $ IntValue (a-b) u
-                                        else Nothing
-simplifyArithmetic (BinaryExpr Multiply (Constant (IntValue a u))
-                                        (Constant (IntValue b v))) =
-                                        Just $ Constant $ IntValue (a*b) (u >* v)
+simplifyArithmetic e@(BinaryExpr Add (Constant _) (Constant _)) =
+    maybeEither $ approx e
+simplifyArithmetic e@(BinaryExpr Subtract (Constant _) (Constant _)) =
+    maybeEither $ approx e
+simplifyArithmetic e@(BinaryExpr Multiply (Constant _) (Constant _)) =
+    maybeEither $ approx e
 simplifyArithmetic (BinaryExpr Power -- whether to simplify constant chosen by heuristic
     (Constant (IntValue a u))
     (Constant (IntValue b v))) = if (isCompat v noUnit && a^b < 1000) then
@@ -255,8 +254,7 @@ simplifyArithmetic (BinaryExpr Divide
     (Constant (IntValue a u))
     (Constant (IntValue b v))) = if (a `mod` b) == 0 then
         (Just $ Constant $ IntValue (a `div` b) (u >/ v)) else Nothing
-simplifyArithmetic (UnaryExpr Negate (Constant (IntValue n u))) =
-    Just $ Constant $ IntValue (negate n) u
+simplifyArithmetic e@(UnaryExpr Negate (Constant _)) = maybeEither $ approx e
 simplifyArithmetic _ = Nothing
 
 -- Perform reduction on a subexpression, if possible. Return the original expr
