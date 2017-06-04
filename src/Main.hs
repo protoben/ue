@@ -10,6 +10,7 @@ import Text.REPL
 import Math.REPL
 import Math.Rewrite
 import Math.Approximate
+import qualified Math.Environment as E
 
 import Data.Units
 
@@ -23,9 +24,12 @@ parseExpr = parse (expr >>= (\x->eof >> return x)) "cmd"
 printExpr :: (MonadIO m) => Expr -> m ()
 printExpr = liftIO . putStrLn . display
 
+substResult :: Monad m => Expr -> ReplT m Expr
+substResult e = substFuncs e >>= substVars >>= (saveResult . simplify)
+
 replDo :: REPLCommand -> ReplT IO ()
-replDo (Evaluate Normal e) = substFuncs e >>= substVars >>= (printExpr . simplify)
-replDo (Evaluate Symbolic e) = substFuncs e >>= substVars >>= (printExpr.simplify)
+replDo (Evaluate Normal e) = substResult e >>= printExpr
+replDo (Evaluate Symbolic e) = substResult e >>= printExpr
 replDo (Evaluate DebugReductions e) = do
     a <- substFuncs e
     b <- substVars a
@@ -38,15 +42,15 @@ replDo (Evaluate ShowReductions e) = do
     let history = mapAccumL (\i e->(i+1, (show i) ++ ". " ++ (display e))) 1
             (a:b:reductions b)
     liftIO $ mapM_ putStrLn $ snd history
-replDo (Evaluate AvoidExpansion e) = printExpr $ simplify e
-replDo (Evaluate Verbatim e) = printExpr e
+replDo (Evaluate AvoidExpansion e) = (saveResult $ simplify e) >>= printExpr
+replDo (Evaluate Verbatim e) = saveResult e >>= printExpr
 replDo (Evaluate Numeric e) = liftM simplify (substFuncs e >>= substVars) >>=
-    (\e->liftIO $ case (approx e) of
-        Left (UnitsError u v) -> putStrLn $ concat ["Incompatible units: ",
-            displayUnit u, " vs ", displayUnit v]
-        Left NotConcrete -> putStrLn "Failed: expression is not concrete"
-        Left err -> print err
-        Right v  -> putStrLn $ display v)
+    (\e->case (approx e) of
+        Left (UnitsError u v) -> liftIO $ putStrLn $
+            concat ["Incompatible units: ",displayUnit u, " vs ", displayUnit v]
+        Left NotConcrete -> liftIO $ putStrLn "Failed: expression is not concrete"
+        Left err -> liftIO $ print err
+        Right v  -> saveResult v >>= (liftIO . putStrLn . display))
 replDo (Evaluate TypeQuery e) = liftM simplify (substFuncs e >>= substVars) >>=
     (\e->liftIO $ if containsSymbols e
          then putStrLn "Failed: expression is not concrete"
@@ -60,13 +64,14 @@ replDo (Evaluate DebugDump e) = liftIO $ print e
 replDo (Evaluate ResultDump e) = substFuncs e >>= substVars >>=
     (liftIO . print . simplify)
 replDo (VarBind n e) = bindVar n e
+replDo (FuncBind n a e) = bindFunc n $ E.SymbolicFn a e
 replDo Help = return ()
 replDo NoAction = return ()
 replDo _    = liftIO $ putStrLn "Unknown REPL command"
 
 replOnce :: ReplT IO ()
 replOnce = do
-    parseResult <- liftIO readRepl
+    parseResult <- readRepl
     case parseResult of
         Left e -> liftIO $ print e
         Right c -> replDo c

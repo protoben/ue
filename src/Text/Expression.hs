@@ -1,4 +1,4 @@
-module Text.Expression (expr, readExpr, funcCall) where
+module Text.Expression (expr, exprExtended, readExpr, funcCall) where
 
 import Data.Expression
 import Data.Units
@@ -10,18 +10,20 @@ import Text.Parsec.Expr
 
 import Control.Monad
 
+type CParserT = ParsecT String ()
+
 -- utility functions
-inSpace :: Parser a -> Parser a
+inSpace :: Monad m => CParserT m a -> CParserT m a
 inSpace p = spaces >> p >>= (\r->spaces >> return r)
 
-symbol :: String -> Parser ()
+symbol :: Monad m => String -> CParserT m ()
 symbol s = (inSpace $ string s) >> return ()
 
-name :: Parser String
-name = inSpace $ liftM2 (:) (letter <|> char '_') (many $ alphaNum <|> char '_')
+name :: Monad m => CParserT m String
+name = inSpace $ liftM2 (:) letter (many $ alphaNum <|> char '_')
 
 -- constant value parsing
-scalarValue :: Parser Value
+scalarValue :: Monad m => CParserT m Value
 scalarValue = inSpace $ numericPart >>= (inSpace . addUnit) where
     numericPart = (try scientific) <|> (try decimal) <|> integer
     scientific = do
@@ -44,10 +46,10 @@ scalarValue = inSpace $ numericPart >>= (inSpace . addUnit) where
         return $ IntValue (read (sign ++ digs)) noUnit
 
     -- parse and add a unit to a dimensionless quantity
-    addUnit :: Value -> Parser Value
+    addUnit :: Monad m => Value -> CParserT m Value
     addUnit v = (liftM (\u->forceUnit u v) $ try unit) <|> (return v)
 
-value :: Parser Value
+value :: Monad m => CParserT m Value
 value = inSpace (vector <|> try scalarValue) where
     vector = liftM vectorPost $ between
         (symbol "<") (symbol ">") (sepBy scalarValue (symbol ","))
@@ -56,19 +58,20 @@ value = inSpace (vector <|> try scalarValue) where
     vectorPost xs = VecN xs
 
 -- expression parsing
-funcCall :: Parser Expr
+funcCall :: Monad m => CParserT m Expr
 funcCall = try $ liftM2 FuncCall name (between
     (symbol "(") (symbol ")")
     (sepBy expr (symbol ",")))
 
-term :: Parser Expr
-term = parenthesized <|> funcCall <|> nameRef <|> (liftM Constant value)
+term :: Monad m => [CParserT m Expr] -> CParserT m Expr
+term more = parenthesized <|> funcCall <|> nameRef <|> (liftM Constant value)
+        <|> choice (map try more)
     where
-        parenthesized = between (symbol "(") (symbol ")") mathExpr
+        parenthesized = between (symbol "(") (symbol ")") (mathExpr more)
         nameRef = liftM NameRef name
 
-mathExpr :: Parser Expr
-mathExpr = buildExpressionParser exprTable term
+mathExpr :: Monad m => [CParserT m Expr] -> CParserT m Expr
+mathExpr terms = buildExpressionParser exprTable (term terms)
     where
         exprTable = [
             [prefix "-" Negate],
@@ -78,20 +81,23 @@ mathExpr = buildExpressionParser exprTable term
         prefix c o = Prefix $ symbol c >> (return $ UnaryExpr o)
         binary c o a = Infix (symbol c >> (return $ BinaryExpr o)) a
 
-expr :: Parser Expr
-expr = (try relation) <|> mathExpr
+-- expression parser which allows custom term parsers
+exprExtended :: Monad m => [CParserT m Expr] -> CParserT m Expr
+exprExtended terms = (try relation) <|> (mathExpr terms)
     where
         relation = do
-            l <- mathExpr
+            l <- mathExpr terms
             op <- choice [
                     try (symbol "=" >> return Equal),
                     try (symbol "<=" >> return Lesser),
                     try (symbol ">=" >> return Greater),
                     try (symbol "<" >> return Lesser),
                     try (symbol ">" >> return Greater)]
-            r <- mathExpr
-
+            r <- mathExpr terms
             return $ RelationExpr op l r
+
+expr :: Monad m => CParserT m Expr
+expr = exprExtended []
 
 readExpr :: IO (Either ParseError Expr)
 readExpr = liftM (parse expr "cmd") getLine

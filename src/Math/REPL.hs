@@ -22,7 +22,8 @@ makeLensesFor [
     ("_precision", "optPrecision")] ''Options
 
 data Context = Context {
-    _options :: Options
+    _options :: Options,
+    _previous :: Maybe Expr
     }
 makeLenses ''Context
 
@@ -31,9 +32,10 @@ type ReplT m = StateT Context (E.EnvT m)
 
 defaultContext :: Context
 defaultContext = Context {
-    _options=Options {_preservePrecision=False, _precision=25}}
+    _options=Options {_preservePrecision=False, _precision=25},
+    _previous=Nothing}
 
-preserve :: (Monad m) => Bool -> ReplT m ()
+preserve :: Monad m => Bool -> ReplT m ()
 preserve p = modify' $ set (options . optPreserve) p
 
 precision :: (Monad m) => Int -> ReplT m ()
@@ -49,17 +51,23 @@ runReplT m = E.evalEnvT E.emptyEnv $ do
 
 -- below here are just operations which re-export Env operations in Repl
 
-substFuncs :: (Monad m) => Expr -> ReplT m Expr
+substFuncs :: Monad m => Expr -> ReplT m Expr
 substFuncs = lift . E.substFuncs
 
-substVars :: (Monad m) => Expr -> ReplT m Expr
+substVars :: Monad m => Expr -> ReplT m Expr
 substVars = lift . E.substVars
 
-bindVar :: (Monad m) => String -> Expr -> ReplT m ()
+bindVar :: Monad m => String -> Expr -> ReplT m ()
 bindVar s e = lift $ E.bindVar s e
 
-bindFunc :: (Monad m) => String -> E.Function -> ReplT m ()
+bindFunc :: Monad m => String -> E.Function -> ReplT m ()
 bindFunc s f = lift $ E.bindFunc s f
+
+saveResult :: Monad m => Expr -> ReplT m Expr
+saveResult e = modify' (set previous (Just e)) >> return e
+
+lastResult :: Monad m => ReplT m (Maybe Expr)
+lastResult = liftM (view $ previous) get
 
 withBindings :: (Monad m) => [(String, Expr)] -> [(String, E.Function)] -> ReplT m a -> ReplT m a
 withBindings v f m = do
