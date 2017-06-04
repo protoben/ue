@@ -10,6 +10,7 @@ import Text.REPL
 import Math.REPL
 import Math.Rewrite
 import Math.Approximate
+import qualified Math.Environment as E
 
 import Data.Units
 
@@ -63,6 +64,7 @@ replDo (Evaluate DebugDump e) = liftIO $ print e
 replDo (Evaluate ResultDump e) = substFuncs e >>= substVars >>=
     (liftIO . print . simplify)
 replDo (VarBind n e) = bindVar n e
+replDo (FuncBind n a e) = bindFunc n $ E.SymbolicFn a e
 replDo Help = return ()
 replDo NoAction = return ()
 replDo _    = liftIO $ putStrLn "Unknown REPL command"

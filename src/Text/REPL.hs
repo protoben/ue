@@ -56,7 +56,8 @@ replCommand = spaces >> (choice $ map try [
     char '\'' >> spaces >> liftM (Evaluate Symbolic) replExpr,
     string "!?" >> spaces >> liftM (Evaluate TypeQuery) replExpr,
     liftM2 VarBind (inSpace name) $ symbol ":=" >> replExpr,
-    funcBind,
+    liftM3 FuncBind name (between (symbol "(") (symbol ")")
+        (sepBy1 name $ char ',')) $ symbol ":=" >> replExpr,
     ((void $ char '?') <|> symbol "help") >> return Help,
     liftM (Evaluate Normal) replExpr,
     return NoAction
