@@ -1,5 +1,5 @@
 module Data.Expression (
-    Expr(..), Value(..), BinOp(..), UnaryOp(..), Relation(..),
+    Expr(..), Value(..), BinOp(..), UnaryOp(..), Relation(..), VariableRef(..),
     containsSymbols, allSymbols,
     display, treeDepth, substM, subst, substVar, forceUnit) where
 
@@ -40,6 +40,8 @@ data Value = IntValue Integer AUnit | -- basic arbitrary-precision integer
     VecN [Value] -- N-dimensional vector
     deriving Show
 
+data VariableRef = NamedRef Name deriving (Show,Eq,Ord)
+
 instance Dimensioned Value where
     dimension (IntValue _ u) = dimension u
     dimension (ExactReal _ _ u) = dimension u
@@ -77,7 +79,7 @@ data Expr =
     BinaryExpr BinOp Expr Expr |
     UnaryExpr UnaryOp Expr |
     FuncCall Name [Expr] |
-    NameRef Name |
+    NameRef VariableRef |
     Constant Value
     deriving (Show,Eq)
 
@@ -92,7 +94,7 @@ containsSymbols (RelationExpr _ a b) = containsSymbols a || containsSymbols b
 
 -- Get a list of all unbound symbols
 allSymbols :: Expr -> [Name]
-allSymbols (NameRef n) = [n]
+allSymbols (NameRef (NamedRef n)) = [n]
 allSymbols (FuncCall _ _) = []
 allSymbols (Constant _) = []
 allSymbols (UnaryExpr _ e) = allSymbols e
@@ -128,7 +130,7 @@ display' p (UnaryExpr Negate a) = (if p == TopLevel then concat else pars)
 display' _ (FuncCall nm args) = concat [[(Name,nm), (Symbol,"(")],
         intercalate [(Symbol,", ")] $ map (display' TopLevel) args,
         [(Symbol,")")]]
-display' _ (NameRef x) = [(Variable,x)]
+display' _ (NameRef (NamedRef x)) = [(Variable,x)]
 display' _ (Constant c) = display c
 
 instance Displayable Expr where
@@ -169,5 +171,5 @@ subst f = head . substM (return . f)
 -- Utility function for substituting a single variable
 substVar :: String -> Expr -> Expr -> Expr
 substVar tgt e = subst (\x->case x of
-    NameRef n -> if n == tgt then (Just e) else Nothing
-    _         -> Nothing)
+    NameRef (NamedRef n) -> if n == tgt then (Just e) else Nothing
+    _                    -> Nothing)

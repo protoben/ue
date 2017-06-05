@@ -28,8 +28,9 @@ differentiate (BinaryExpr Divide f g) x =
                 (BinaryExpr Multiply g <$> f') <*>
                 (BinaryExpr Multiply f <$> g')) <*>
             (Just $ BinaryExpr Power g (Constant $ IntValue 2 noUnit))
-differentiate (NameRef n) x = if x == n then Just $ Constant $ IntValue 1 noUnit
-                                        else Just $ Constant $ IntValue 0 noUnit
+differentiate (NameRef (NamedRef n)) x =
+    if x == n then Just $ Constant $ IntValue 1 noUnit
+              else Just $ Constant $ IntValue 0 noUnit
 differentiate (Constant v) x = Just $ Constant $ IntValue 0 noUnit
 
 diff = BuiltinSymbolic $ \xs->case xs of
@@ -38,7 +39,7 @@ diff = BuiltinSymbolic $ \xs->case xs of
         []  -> return $ differentiate e "x"
         [x] -> return $ differentiate e x
         _   -> return Nothing)
-    [e,(NameRef v)] -> return $ differentiate e v
+    [e,(NameRef (NamedRef v))] -> return $ differentiate e v
     _   -> return Nothing
 
 setupEnvironment :: Monad m => EnvT m ()

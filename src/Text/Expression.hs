@@ -68,7 +68,7 @@ term more = parenthesized <|> funcCall <|> nameRef <|> (liftM Constant value)
         <|> choice (map try more)
     where
         parenthesized = between (symbol "(") (symbol ")") (mathExpr more)
-        nameRef = liftM NameRef name
+        nameRef = liftM (NameRef . NamedRef) name
 
 mathExpr :: Monad m => [CParserT m Expr] -> CParserT m Expr
 mathExpr terms = buildExpressionParser exprTable (term terms)
