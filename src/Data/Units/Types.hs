@@ -70,7 +70,7 @@ data UnitSystem = UnitSystem {
 
 -- anonymous unit type used when evaluating expressions
 newtype AnonymousUnit = AnonymousUnit
-    ([(Rational,BaseUnit)],[(Rational,BaseUnit)]) deriving Show
+    ([(Rational,BaseUnit)],[(Rational,BaseUnit)]) deriving (Show,Eq)
 
 class Unit a where
     toFrac :: a -> AnonymousUnit

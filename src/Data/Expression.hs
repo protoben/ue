@@ -80,6 +80,7 @@ data Expr =
     UnaryExpr UnaryOp Expr |
     FuncCall Name [Expr] |
     NameRef VariableRef |
+    TypeAssertion Expr AUnit |
     Constant Value
     deriving (Show,Eq)
 
@@ -91,6 +92,7 @@ containsSymbols (Constant _) = False
 containsSymbols (UnaryExpr _ e) = containsSymbols e
 containsSymbols (BinaryExpr _ a b) = containsSymbols a || containsSymbols b
 containsSymbols (RelationExpr _ a b) = containsSymbols a || containsSymbols b
+containsSymbols (TypeAssertion e _) = containsSymbols e
 
 -- Get a list of all unbound symbols
 allSymbols :: Expr -> [Name]
@@ -100,6 +102,7 @@ allSymbols (Constant _) = []
 allSymbols (UnaryExpr _ e) = allSymbols e
 allSymbols (BinaryExpr _ l r) = allSymbols l ++ allSymbols r
 allSymbols (RelationExpr _ l r) = allSymbols l ++ allSymbols r
+allSymbols (TypeAssertion e _) = allSymbols e
 
 data ParentType = TopLevel | AddSub | Sub | Mul | Div | PowerLeft |
     PowerRight | Unary deriving Eq
@@ -131,6 +134,7 @@ display' _ (FuncCall nm args) = concat [[(Name,nm), (Symbol,"(")],
         intercalate [(Symbol,", ")] $ map (display' TopLevel) args,
         [(Symbol,")")]]
 display' _ (NameRef (NamedRef x)) = [(Variable,x)]
+display' l (TypeAssertion e u) = concat [display' l e, [(Symbol,":")], display u]
 display' _ (Constant c) = display c
 
 instance Displayable Expr where
@@ -142,6 +146,7 @@ treeDepth (BinaryExpr _ l r) = 1 + (max (treeDepth l) (treeDepth r))
 treeDepth (UnaryExpr o x) = (if o == Negate then 0 else 1) + (treeDepth x)
 treeDepth (FuncCall _ xs) = 1 + (foldl' max 0 $ map treeDepth xs)
 treeDepth (NameRef _) = 1
+treeDepth (TypeAssertion e _) = treeDepth e
 treeDepth (Constant _) = 1
 
 fromMaybeM :: (Monad m) => m (Maybe b) -> m b -> m b
@@ -163,6 +168,8 @@ substM f x@(UnaryExpr op e) = fromMaybeM (f x) $
 substM f x@(FuncCall n es) = fromMaybeM (f x) $ liftM (FuncCall n) $
     mapM (substM f) es
 substM f x@(NameRef n) = fromMaybeM (f x) $ return x
+substM f x@(TypeAssertion e u) = fromMaybeM (f x) $
+    liftM (\x->TypeAssertion x u) $ substM f e
 substM f x@(Constant v) = fromMaybeM (f x) $ return x
 
 subst :: (Expr -> Maybe Expr) -> Expr -> Expr
