@@ -39,7 +39,7 @@ funcBind = char '^' >> return Help
 
 replExpr :: Monad m => CParserT (ReplT m) Expr
 replExpr = exprExtended [
-        char '_' >> (lift lastResult) >>= (\x->case x of
+        inSpace (char '_') >> (lift lastResult) >>= (\x->case x of
             Nothing -> fail "No previous result to retrieve"
             Just r -> return r)]
 
