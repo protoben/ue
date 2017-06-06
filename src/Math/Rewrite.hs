@@ -7,45 +7,10 @@ import Data.Expression
 import Data.Units
 
 import Math.Approximate
+import Math.Rewrite.Engine
 
 import Control.Monad
 import Control.Applicative
-
-data IDType = Any | Literal | Nonliteral deriving Show
-
-data RRExpr =
-    RRRelated Relation RRExpr RRExpr |
-    RRBinary BinOp RRExpr RRExpr |
-    RRUnary UnaryOp RRExpr |
-    RRIdentifier IDType Char |
-    RRExpr Expr
-    deriving Show
-
-infix 6 =:
-infixl 7 =+
-infixl 7 =-
-infixl 8 =*
-infixl 8 =/
-infixl 9 =^
-
-(=+) :: RRExpr -> RRExpr -> RRExpr
-a =+ b = RRBinary Add a b
-(=-) :: RRExpr -> RRExpr -> RRExpr
-a =- b = RRBinary Subtract a b
-(=*) :: RRExpr -> RRExpr -> RRExpr
-a =* b = RRBinary Multiply a b
-(=/) :: RRExpr -> RRExpr -> RRExpr
-a =/ b = RRBinary Divide a b
-(=^) :: RRExpr -> RRExpr -> RRExpr
-a =^ b = RRBinary Power a b
-neg :: RRExpr -> RRExpr
-neg a = RRUnary Negate a
-
-(=:) :: RRExpr -> RRExpr -> RRExpr
-a =: b = RRRelated Equal a b
-
-type RewriteRule = (RRExpr, RRExpr)
-type Reduction = Expr -> Maybe Expr
 
 rewriteRules :: [RewriteRule]
 rewriteRules =
@@ -128,56 +93,10 @@ rewriteRules =
 
         csti n = cst (IntValue n noUnit)
 
--- Check whether there are any conflicts in a match result and return Nothing if
--- any are found.
-checkConflicts :: Maybe [(Char, Expr)] -> Maybe [(Char, Expr)]
-checkConflicts Nothing = Nothing
-checkConflicts (Just e) = let env = nub e in
-    if length env /= (length $ nubBy (\l r->fst l == fst r) env) then Nothing
-    else Just e
-
--- Try to match a rewrite rule to the given expression, and return the bindings
--- for each symbol
-matchRule :: Expr -> RRExpr -> Maybe [(Char, Expr)]
-matchRule e@(Constant _) (RRIdentifier Literal c) = Just [(c, e)]
-matchRule e (RRIdentifier Nonliteral c) = if containsSymbols e then Just [(c,e)] else Nothing
-matchRule e (RRIdentifier Any c) = Just [(c, e)]
-matchRule (RelationExpr o l r) (RRRelated o' a b) = if o /= o' then Nothing else
-    checkConflicts $ fmap concat $ sequence [matchRule l a, matchRule r b]
-matchRule (BinaryExpr o l r) (RRBinary o' a b) = if o /= o' then Nothing else
-    checkConflicts $ fmap concat $ sequence [matchRule l a, matchRule r b]
-matchRule (UnaryExpr o e) (RRUnary o' r) = if o /= o' then Nothing else
-    matchRule e r
-matchRule e (RRExpr e') = if e == e' then Just [] else Nothing
-matchRule _ _ = Nothing
-
--- Substitute expressions in for identifiers in a rewrite expr, and return the
--- resulting expression
-bindRule :: [(Char, Expr)] -> RRExpr -> Maybe Expr
-bindRule e (RRRelated o a b) = RelationExpr o <$> (bindRule e a) <*> (bindRule e b)
-bindRule e (RRBinary o a b) = BinaryExpr o <$> (bindRule e a) <*> (bindRule e b)
-bindRule e (RRUnary o a) = UnaryExpr o <$> bindRule e a
-bindRule e (RRIdentifier _ c) = lookup c e
-bindRule e (RRExpr e') = Just e'
-
--- Utility function for expression binding. Applies the function to the first
--- list item for which is returns Just, then substitutes that into the rest of
--- the list.
-applyOnce :: (a -> Maybe a) -> [a] -> Maybe [a]
-applyOnce f [] = Nothing
-applyOnce f (x:xs) = (fmap (:xs) $ f x) <|> (fmap (x:) $ applyOnce f xs)
-
 -- Utility function - take a function and produce a result only if it changes
 -- the input.
 onChange :: Eq a => (a -> a) -> a -> Maybe a
 onChange f x = let v = f x in if x == v then Nothing else Just v
-
--- Apply one rule and return the reduced expression, if any rule applies
-rewrite :: Reduction
-rewrite e = (case matches of
-        []    -> Nothing
-        (x:_) -> uncurry bindRule x) where
-    matches = mapMaybe (\(s,t)->fmap (\x->(x,t)) $ matchRule e s) rewriteRules
 
 -- Extract lists of terms connected by addition and subtraction, converting the
 -- subtracted terms to their negated forms.
@@ -284,6 +203,13 @@ simplifyArithmetic (BinaryExpr Divide
 simplifyArithmetic e@(UnaryExpr Negate (Constant _)) = maybeEither $ approx e
 simplifyArithmetic _ = Nothing
 
+-- Utility function for expression binding. Applies the function to the first
+-- list item for which it returns Just, then substitutes that into the rest of
+-- the list.
+applyOnce :: (a -> Maybe a) -> [a] -> Maybe [a]
+applyOnce f [] = Nothing
+applyOnce f (x:xs) = (fmap (:xs) $ f x) <|> (fmap (x:) $ applyOnce f xs)
+
 -- Perform reduction on a subexpression, if possible. Return the original expr
 -- with the altered subexpr substituted in.
 reduceSubexpr :: Reduction
@@ -302,7 +228,7 @@ reduceExpr :: Expr -> Maybe Expr
 reduceExpr e = foldl1' (<|>) $ map (\f->f e) [
     simplifyArithmetic,        -- eagerly simplify integer arithmetic
     onChange reorderLikeTerms, -- then group terms
-    rewrite,                   -- try to perform complex rewrite operations
+    rewrite rewriteRules,      -- try to perform complex rewrite operations
     reduceSubexpr]             -- or try to reduce a subexpression
 
 -- Build a potentially-infinite chain of successive reductions for an expression
