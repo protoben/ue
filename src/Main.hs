@@ -6,6 +6,7 @@ import Data.List
 import Data.Expression
 import Text.Expression
 import Text.REPL
+import Data.Display
 
 import Math.REPL
 import Math.Rewrite
@@ -13,6 +14,8 @@ import Math.Approximate
 import qualified Math.Environment as E
 
 import Data.Units
+
+import UI.REPL
 
 import Control.Monad
 import Control.Monad.Trans.Class
@@ -22,7 +25,7 @@ parseExpr :: String -> Either ParseError Expr
 parseExpr = parse (expr >>= (\x->eof >> return x)) "cmd"
 
 printExpr :: (MonadIO m) => Expr -> m ()
-printExpr = liftIO . putStrLn . display
+printExpr = liftIO . putStrLn . displayColors
 
 substResult :: Monad m => Expr -> ReplT m Expr
 substResult e = substFuncs e >>= substVars >>= (saveResult . simplify)
@@ -39,18 +42,18 @@ replDo (Evaluate DebugReductions e) = do
 replDo (Evaluate ShowReductions e) = do
     a <- substFuncs e
     b <- substVars a
-    let history = mapAccumL (\i e->(i+1, (show i) ++ ". " ++ (display e))) 1
+    let history = mapAccumL (\i e->(i+1, (show i) ++ ". " ++ (displayColors e))) 1
             (a:b:reductions b)
     liftIO $ mapM_ putStrLn $ snd history
 replDo (Evaluate AvoidExpansion e) = (saveResult $ simplify e) >>= printExpr
 replDo (Evaluate Verbatim e) = saveResult e >>= printExpr
-replDo (Evaluate Numeric e) = liftM simplify (substFuncs e >>= substVars) >>=
-    (\e->case (approx e) of
+replDo (Evaluate Approximate e) =
+    liftM simplify (substFuncs e >>= substVars) >>= (\e->case (approx e) of
         Left (UnitsError u v) -> liftIO $ putStrLn $
             concat ["Incompatible units: ",displayUnit u, " vs ", displayUnit v]
         Left NotConcrete -> liftIO $ putStrLn "Failed: expression is not concrete"
         Left err -> liftIO $ print err
-        Right v  -> saveResult v >>= (liftIO . putStrLn . display))
+        Right v  -> saveResult v >>= (liftIO . putStrLn . displayColors))
 replDo (Evaluate TypeQuery e) = liftM simplify (substFuncs e >>= substVars) >>=
     (\e->liftIO $ if containsSymbols e
          then putStrLn "Failed: expression is not concrete"

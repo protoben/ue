@@ -212,8 +212,8 @@ equalGroup xs = fst $ fromJust $ find (null . snd) $
 
 -- Reorder a list of expressions by (tree depth, variable name)
 sortExprGroups :: [[Expr]] -> [[Expr]]
-sortExprGroups = sortBy (\(a:_) (b:_)->mconcat $ map (\f->f a b) [depth, naming])
-    where
+sortExprGroups = sortBy (\(a:_) (b:_)->mconcat $ map (\f->f a b)
+    [depth, naming, constSize]) where
         depth :: Expr -> Expr -> Ordering
         depth = compare `on` treeDepth
 
@@ -226,6 +226,12 @@ sortExprGroups = sortBy (\(a:_) (b:_)->mconcat $ map (\f->f a b) [depth, naming]
         naming (BinaryExpr _ l r) b@(NameRef _) = (naming l b) `mappend` (naming r b)
         naming (Constant _) b@(NameRef _) = LT
         naming _ _ = EQ
+
+        constSize :: Expr -> Expr -> Ordering
+        constSize (Constant a) (Constant b) = compareValues a b
+        constSize (UnaryExpr _ a) b = constSize a b
+        constSize a (UnaryExpr _ b) = constSize a b
+        constSize _ _ = EQ
 
 -- Reorder chains of commutative operations so like terms are adjacent.
 reorderLikeTerms :: Expr -> Expr

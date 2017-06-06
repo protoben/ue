@@ -1,4 +1,4 @@
-module Math.Approximate (approx, ApproxError(..)) where
+module Math.Approximate (approx, ApproxError(..), compareValues) where
 
 import Data.Expression
 import Data.Units
@@ -110,3 +110,13 @@ approx e = if containsSymbols e then Left NotConcrete
         approx' a >>= (\a->approx' b >>= (approxBinary op a))
     approx' (UnaryExpr Negate a) = flipSign <$> approx' a
     approx' (Constant v) = Right v
+
+compareValues :: Value -> Value -> Ordering
+compareValues (IntValue n _) (IntValue m _) = compare n m
+compareValues e@(ExactReal n p _) (IntValue m _) = compareValues e $ ExactReal m 0 noUnit
+compareValues (IntValue m _) e@(ExactReal n p _) = compareValues (ExactReal m 0 noUnit) e
+compareValues (ExactReal n p _) (ExactReal m q _) = case compare p q of
+    EQ -> compare n m
+    LT -> compare (n*(10^(q-p))) m
+    GT -> compare n (m*(10^(p-q)))
+compareValues _ _ = EQ
