@@ -104,6 +104,10 @@ allSymbols (BinaryExpr _ l r) = allSymbols l ++ allSymbols r
 allSymbols (RelationExpr _ l r) = allSymbols l ++ allSymbols r
 allSymbols (TypeAssertion e _) = allSymbols e
 
+-- convert a value to a different unit
+convertValue :: Unit a => Value -> a -> Maybe Value
+convertValue
+
 data ParentType = TopLevel | AddSub | Sub | Mul | Div | PowerLeft |
     PowerRight | Unary deriving Eq
 
