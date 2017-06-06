@@ -1,8 +1,16 @@
-module Data.Units.Types where
+module Data.Units.Types (
+    BaseDimension(..), Dimension(..), BaseUnit(..), DerivedUnit(..),
+    AnonymousUnit(..),
+    Unit(..), Dimensioned(..), UnitSystem(..),
+    isCompat, inv, unitPow, reduceUnit, convertUnit, noUnit,
+    msIntersect,
+    (>*), (>/)
+    ) where
 
 import Data.List
 import Data.Function
 import Control.Arrow
+import Control.Monad
 
 data BaseDimension = Mass | Distance | Luminosity | Time | Temperature | Current
     deriving (Show, Eq, Ord)
@@ -70,7 +78,7 @@ data UnitSystem = UnitSystem {
 
 -- anonymous unit type used when evaluating expressions
 newtype AnonymousUnit = AnonymousUnit
-    ([(Rational,BaseUnit)],[(Rational,BaseUnit)]) deriving Show
+    ([(Rational,BaseUnit)],[(Rational,BaseUnit)]) deriving (Show,Eq)
 
 class Unit a where
     toFrac :: a -> AnonymousUnit
@@ -109,6 +117,63 @@ reduceUnit u = reducer (sortFactors ts) (sortFactors bs) where
     reducer [] ys = AnonymousUnit ([],ys)
     reducer (x:xs) ys = if elem x ys then reducer xs (delete x ys) else
         let (AnonymousUnit (ts,bs)) = reducer xs ys in AnonymousUnit (x:ts,bs)
+
+-- find the conversion factor from one basic unit to another
+conversionFactor :: (Rational,BaseUnit) -> (Rational,BaseUnit)
+                    -> Maybe Rational
+conversionFactor a@(ar,au) b@(br,bu)
+    | not (isCompat au bu)  = Nothing
+    | au == bu              = Just $ br / ar
+-- TODO: handle compatible units from different systems
+
+-- multiset intersection for lists
+msIntersect :: Eq a => [a] -> [a] -> [a]
+msIntersect [] ys = []
+msIntersect xs [] = []
+msIntersect (x:xs) ys = if x `elem` ys then x:(msIntersect xs $ delete x ys)
+                                       else msIntersect xs ys
+
+-- implement the factor-label method for unit conversion
+factorLabel :: AnonymousUnit -> AnonymousUnit -> Maybe Rational
+factorLabel (AnonymousUnit ([x],[])) (AnonymousUnit ([y],[])) =
+    if isCompat (snd x) (snd y) then conversionFactor x y else Nothing
+factorLabel (AnonymousUnit ([],[x])) (AnonymousUnit ([],[y])) =
+    if isCompat (snd x) (snd y) then conversionFactor x y else Nothing
+factorLabel (AnonymousUnit (xs,ys)) (AnonymousUnit (xs',ys')) = factor where
+    common :: ([(Rational,BaseUnit)],[(Rational,BaseUnit)])
+
+    -- split into the common part (that we don't need to convert) and the rest
+    -- which needs to be adapted
+    common = (xs `msIntersect` xs', ys `msIntersect` ys')
+    (restX,restY) = ((xs \\ (fst common), ys \\ (snd common)),
+                     (xs' \\ (fst common), ys' \\ (snd common)))
+
+    -- zip dimensionally compatible units from the given lists together and
+    -- return the overall conversion factor
+    cvtDims  :: [(Rational,BaseUnit)] -> [(Rational,BaseUnit)] -> Maybe Rational
+    cvtDims xs ys = if xdims /= ydims then Nothing
+        else fmap product $ mapM (uncurry conversionFactor) pairs where
+            basedim :: BaseUnit -> BaseDimension
+            basedim (BaseUnit _ _ d) = d
+            (xs',ys') = (sortOn (basedim . snd) xs, sortOn (basedim . snd) ys)
+            (xdims,ydims) = (map (basedim . snd) xs', map (basedim . snd) ys')
+            pairs :: [((Rational,BaseUnit),(Rational,BaseUnit))]
+            pairs = zip xs' ys'
+
+    -- generate overall non-compatible unit factor from top and bottom factors
+    topFactor = cvtDims (fst restX) (fst restY)
+    btmFactor = cvtDims (snd restX) (snd restY)
+    factor = liftM2 (/) btmFactor topFactor
+
+-- Return the conversion factor from one unit to another of the same dimension.
+-- If dimensions don't match, returns Nothing
+convertUnit :: (Unit a, Unit b) => a -> b -> Maybe Rational
+convertUnit a b = if not $ isCompat aa ab
+        then Nothing else factorLabel aa ab where
+    -- convert to anonymous unit forms
+    aa :: AnonymousUnit
+    ab :: AnonymousUnit
+    (aa,ab) = (toFrac a, toFrac b)
 
 noUnit :: AnonymousUnit
 noUnit = AnonymousUnit ([],[])
