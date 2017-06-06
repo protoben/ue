@@ -210,20 +210,29 @@ equalGroup xs = fst $ fromJust $ find (null . snd) $
     iterate gatherMore ([], xs) where
     gatherMore (gs,(x:xs)) = let (g,ys) = partition (== x) xs in (gs ++ [x:g], ys)
 
--- Reorder a list of expressions by (tree depth, variable name)
+-- just a local instance to make dimensions sortable for grouping
+-- doesn't really implement anything specifically
+instance Ord Dimension where
+    compare (Dimension xs ys) (Dimension xs' ys') = foldl' mappend EQ
+        [compare xs xs',
+         compare ys ys']
+
+-- Reorder a list of expressions to group similar ones
 sortExprGroups :: [[Expr]] -> [[Expr]]
 sortExprGroups = sortBy (\(a:_) (b:_)->mconcat $ map (\f->f a b)
-    [depth, naming, constSize]) where
+            [depth, naming, dimensions, constSize]) where
         depth :: Expr -> Expr -> Ordering
         depth = compare `on` treeDepth
 
         naming :: Expr -> Expr -> Ordering
         naming (NameRef a) (NameRef b) = compare a b
-        naming a@(NameRef _) (BinaryExpr _ l r) = (naming a l) `mappend` (naming a r)
+        naming a@(NameRef _) (BinaryExpr _ l r) =
+            (naming a l) `mappend` (naming a r)
         naming a@(NameRef _) (Constant _) = GT
         naming (UnaryExpr _ a) b = naming a b
         naming a (UnaryExpr _ b) = naming a b
-        naming (BinaryExpr _ l r) b@(NameRef _) = (naming l b) `mappend` (naming r b)
+        naming (BinaryExpr _ l r) b@(NameRef _) =
+            (naming l b) `mappend` (naming r b)
         naming (Constant _) b@(NameRef _) = LT
         naming _ _ = EQ
 
@@ -232,6 +241,16 @@ sortExprGroups = sortBy (\(a:_) (b:_)->mconcat $ map (\f->f a b)
         constSize (UnaryExpr _ a) b = constSize a b
         constSize a (UnaryExpr _ b) = constSize a b
         constSize _ _ = EQ
+
+        dimensions :: Expr -> Expr -> Ordering
+        dimensions (Constant u) (Constant v) = compare (dimension u) (dimension v)
+        dimensions (UnaryExpr _ a) v = dimensions a v
+        dimensions u (UnaryExpr _ a) = dimensions u a
+        dimensions (BinaryExpr _ a b) v =
+            (dimensions a v) `mappend` (dimensions b v)
+        dimensions u (BinaryExpr _ a b) =
+            (dimensions u a) `mappend` (dimensions u b)
+        dimensions _ _ = EQ
 
 -- Reorder chains of commutative operations so like terms are adjacent.
 reorderLikeTerms :: Expr -> Expr
