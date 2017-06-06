@@ -62,10 +62,10 @@ approxBinary Multiply (IntValue a u) (IntValue b u') =
 approxBinary Divide   (IntValue a u) (IntValue b u') = if (mod a b) == 0
     then Right $ IntValue (div a b) (u >/ u')
     else approxBinary Divide (ExactReal a 0 u) (ExactReal b 0 u')
-approxBinary Power  l@(IntValue a u) r@(IntValue b u') =
+approxBinary Power l@(IntValue a u) r@(IntValue b u') =
     if (dimension r) == Dimensionless then Right $ IntValue (a ^ b) u
                                       else Left $ UnitPowerError u'
-approxBinary Add    l@(ExactReal a ae u) r@(ExactReal b be u') = if isCompat l r
+approxBinary Add l@(ExactReal a ae u) r@(ExactReal b be u') = if isCompat l r
     then case compare ae be of
         EQ -> Right $ ExactReal (a+b) ae u
         LT -> approxBinary Add (ExactReal a ae u)
@@ -73,12 +73,8 @@ approxBinary Add    l@(ExactReal a ae u) r@(ExactReal b be u') = if isCompat l r
         GT -> approxBinary Add (ExactReal (a*(10^(ae-be))) be u)
                                (ExactReal b be u')
     else Left $ UnitsError u u'
-approxBinary Subtract (ExactReal a ae u) (ExactReal b be u') = if isCompat u u'
-    then case compare ae be of
-        EQ -> Right $ ExactReal (a-b) ae u
-        LT -> approxBinary Add (ExactReal a ae u) (ExactReal (b*(be-ae)) ae u')
-        GT -> approxBinary Add (ExactReal (a*(ae-be)) be u) (ExactReal b be u')
-    else Left $ UnitsError u u'
+approxBinary Subtract (ExactReal a ae u) (ExactReal b be u') =
+    approxBinary Add (ExactReal a ae u) (ExactReal (-b) be u')
 approxBinary Multiply (ExactReal a ae u) (ExactReal b be u') = Right $
     ExactReal (a*b) (ae+be) (u >* u')
 approxBinary Divide   (ExactReal a ae u) (ExactReal b be u') = Right $
