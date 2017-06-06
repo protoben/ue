@@ -174,11 +174,10 @@ onChange f x = let v = f x in if x == v then Nothing else Just v
 
 -- Apply one rule and return the reduced expression, if any rule applies
 rewrite :: Reduction
-rewrite e = if null matches then Nothing else rewritten
-    where
-        rewritten :: Maybe Expr
-        rewritten = uncurry bindRule $ head matches
-        matches = mapMaybe (\(s,t)->fmap (\x->(x,t)) $ matchRule e s) rewriteRules
+rewrite e = (case matches of
+        []    -> Nothing
+        (x:_) -> uncurry bindRule x) where
+    matches = mapMaybe (\(s,t)->fmap (\x->(x,t)) $ matchRule e s) rewriteRules
 
 -- Extract lists of terms connected by addition and subtraction, converting the
 -- subtracted terms to their negated forms.
