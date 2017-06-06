@@ -68,7 +68,24 @@ replDo (Evaluate ResultDump e) = substFuncs e >>= substVars >>=
     (liftIO . print . simplify)
 replDo (VarBind n e) = bindVar n e
 replDo (FuncBind n a e) = bindFunc n $ E.SymbolicFn a e
-replDo Help = return ()
+replDo Help = liftIO $ mapM_ putStrLn [
+    "ue - universal evaluator - v0.1",
+    "      REPL COMMAND LIST",
+    "<expr>                 Evaluate an expression",
+    ",<expr>                Show the internal AST for an expression",
+    ";<expr>                Evaluate an expression and show its AST",
+    "!<expr>                Approximate an expression numerically",
+    "\"<expr>                Echo an expression without evaluation",
+    "`<expr>                Evaluate an expression without expanding variables",
+    "                       or function applications.",
+    "\\<expr>                Evaluate, showing each reduction step",
+    "\\\\<expr>               Evaluate, showing the AST at each reduction",
+    --"'<expr>                Evaluate in symbolic mode",
+    "!?<expr>               Show the dimensions of an expression",
+    "v := e                 Define variable v as expression e",
+    "f(x,y..) := e          Define function f as expression e",
+    "?                      Display this help",
+    "help                   Display this help"]
 replDo NoAction = return ()
 replDo _    = liftIO $ putStrLn "Unknown REPL command"
 
