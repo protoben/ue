@@ -37,13 +37,13 @@ replDo (Evaluate DebugReductions e) = do
     a <- substFuncs e
     b <- substVars a
     let history = mapAccumL (\i e->(i+1, (show i) ++ ". " ++ (show e))) 1
-            (a:b:reductions b)
+            (a:b:simplifyHistory b)
     liftIO $ mapM_ putStrLn $ snd history
 replDo (Evaluate ShowReductions e) = do
     a <- substFuncs e
     b <- substVars a
     let history = mapAccumL (\i e->(i+1, (show i) ++ ". " ++ (displayColors e))) 1
-            (a:b:reductions b)
+            (a:b:simplifyHistory b)
     liftIO $ mapM_ putStrLn $ snd history
 replDo (Evaluate AvoidExpansion e) = (saveResult $ simplify e) >>= printExpr
 replDo (Evaluate Verbatim e) = saveResult e >>= printExpr

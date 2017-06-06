@@ -38,6 +38,7 @@ test-suite symbolic-reduction
     Data.Display
     Math.Rewrite
     Math.Rewrite.Engine
+    Math.Rewrite.Reductions
     Math.Approximate
   build-depends:
     Cabal,
