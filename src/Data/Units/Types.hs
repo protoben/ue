@@ -123,7 +123,7 @@ conversionFactor :: (Rational,BaseUnit) -> (Rational,BaseUnit)
                     -> Maybe Rational
 conversionFactor a@(ar,au) b@(br,bu)
     | not (isCompat au bu)  = Nothing
-    | au == bu              = Just $ br / ar
+    | au == bu              = Just $ ar / br
 -- TODO: handle compatible units from different systems
 
 -- multiset intersection for lists

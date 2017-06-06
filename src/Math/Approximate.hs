@@ -51,9 +51,16 @@ exactFracPower (a,ae,u) (b,be) = ExactReal 0 0 u
 
 -- try to make two values have the same unit
 sameUnits :: (Value,Value) -> Either ApproxError (Value,Value)
+sameUnits (a,b) = case (valueUnit b) >>= (convertValue a) of
+    Nothing -> Left TypeError
+    Just r  -> Right (r,b)
 
 -- TODO: Implement conversions between different units with matching dimensions
 approxBinary :: BinOp -> Value -> Value -> ApproxResult
+approxBinary o (IntValue n u) e@(ExactReal _ _ _) =
+    approxBinary o (ExactReal n 0 u) e
+approxBinary o e@(ExactReal _ _ _) (IntValue n u) =
+    approxBinary o e (ExactReal n 0 u)
 approxBinary Add l r = sameUnits (l,r) >>= (\(l,r)->case (l,r) of
     ((IntValue a u),(IntValue b u')) -> Right $ IntValue (a+b) u
     ((ExactReal a ae u),(ExactReal b be u')) -> case compare ae be of
@@ -62,9 +69,11 @@ approxBinary Add l r = sameUnits (l,r) >>= (\(l,r)->case (l,r) of
                                (ExactReal (b*(10^(be-ae))) ae u')
         GT -> approxBinary Add (ExactReal (a*(10^(ae-be))) be u)
                                (ExactReal b be u')
-approxBinary Subtract l@(IntValue a u) r@(IntValue b u') = if isCompat l r
-    then Right $ IntValue (a - b*(convertUnit u' u)) u
-    else Left $ UnitsError u u'
+    -- recurse for conversion+normalization
+    (a@(IntValue _ _),b@(ExactReal _ _ _)) -> approxBinary Add a b
+    (a@(ExactReal _ _ _),b@(IntValue _ _)) -> approxBinary Add a b)
+approxBinary Subtract l@(IntValue a u) (IntValue b u') =
+    approxBinary Add l (IntValue (-b) u')
 approxBinary Multiply (IntValue a u) (IntValue b u') =
     Right $ IntValue (a * b) (u >* u')
 approxBinary Divide   (IntValue a u) (IntValue b u') = if (mod a b) == 0
@@ -73,40 +82,8 @@ approxBinary Divide   (IntValue a u) (IntValue b u') = if (mod a b) == 0
 approxBinary Power l@(IntValue a u) r@(IntValue b u') =
     if (dimension r) == Dimensionless then Right $ IntValue (a ^ b) u
                                       else Left $ UnitPowerError u'
-<<<<<<< Updated upstream
-approxBinary Add l@(ExactReal a ae u) r@(ExactReal b be u') = if isCompat l r
-    then case compare ae be of
-        EQ -> Right $ ExactReal (a+b) ae u
-        LT -> approxBinary Add (ExactReal a ae u)
-                               (ExactReal (b*(10^(be-ae))) ae u')
-        GT -> approxBinary Add (ExactReal (a*(10^(ae-be))) be u)
-                               (ExactReal b be u')
-    else Left $ UnitsError u u'
 approxBinary Subtract (ExactReal a ae u) (ExactReal b be u') =
     approxBinary Add (ExactReal a ae u) (ExactReal (-b) be u')
-||||||| merged common ancestors
-approxBinary Add    l@(ExactReal a ae u) r@(ExactReal b be u') = if isCompat l r
-    then case compare ae be of
-        EQ -> Right $ ExactReal (a+b) ae u
-        LT -> approxBinary Add (ExactReal a ae u)
-                               (ExactReal (b*(10^(be-ae))) ae u')
-        GT -> approxBinary Add (ExactReal (a*(10^(ae-be))) be u)
-                               (ExactReal b be u')
-    else Left $ UnitsError u u'
-approxBinary Subtract (ExactReal a ae u) (ExactReal b be u') = if isCompat u u'
-    then case compare ae be of
-        EQ -> Right $ ExactReal (a-b) ae u
-        LT -> approxBinary Add (ExactReal a ae u) (ExactReal (b*(be-ae)) ae u')
-        GT -> approxBinary Add (ExactReal (a*(ae-be)) be u) (ExactReal b be u')
-    else Left $ UnitsError u u'
-=======
-approxBinary Subtract (ExactReal a ae u) (ExactReal b be u') = if isCompat u u'
-    then case compare ae be of
-        EQ -> Right $ ExactReal (a-b*(convertUnit u' u)) ae u
-        LT -> approxBinary Add (ExactReal a ae u) (ExactReal (b*(be-ae)) ae u')
-        GT -> approxBinary Add (ExactReal (a*(ae-be)) be u) (ExactReal b be u')
-    else Left $ UnitsError u u'
->>>>>>> Stashed changes
 approxBinary Multiply (ExactReal a ae u) (ExactReal b be u') = Right $
     ExactReal (a*b) (ae+be) (u >* u')
 approxBinary Divide   (ExactReal a ae u) (ExactReal b be u') = Right $
@@ -117,10 +94,6 @@ approxBinary Power    l@(ExactReal a ae u) r@(ExactReal b be u') =
             (exactIntPower (a,ae,u) $ ipartExact (b,be))
             (exactFracPower (a,ae,u) $ fpartExact (b,be))
     else Left $ UnitPowerError u'
-approxBinary o (IntValue n u) e@(ExactReal _ _ _) =
-    approxBinary o (ExactReal n 0 u) e
-approxBinary o e@(ExactReal _ _ _) (IntValue n u) =
-    approxBinary o e (ExactReal n 0 u)
 
 approx :: Expr -> Either ApproxError Expr
 approx (RelationExpr op a b) = case (approx a, approx b) of

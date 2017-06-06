@@ -212,9 +212,12 @@ equalGroup xs = fst $ fromJust $ find (null . snd) $
 -- just a local instance to make dimensions sortable for grouping
 -- doesn't really implement anything specifically
 instance Ord Dimension where
+    compare Dimensionless Dimensionless = EQ
     compare (Dimension xs ys) (Dimension xs' ys') = foldl' mappend EQ
         [compare xs xs',
          compare ys ys']
+    compare Dimensionless (Dimension _ _) = LT
+    compare (Dimension _ _) Dimensionless = GT
 
 -- Reorder a list of expressions to group similar ones
 sortExprGroups :: [[Expr]] -> [[Expr]]
