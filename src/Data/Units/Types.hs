@@ -9,6 +9,7 @@ module Data.Units.Types (
 
 import Data.List
 import Data.Function
+
 import Control.Arrow
 import Control.Monad
 
@@ -112,6 +113,7 @@ unitPow n u = let (AnonymousUnit (t,b)) = toFrac u in
 reduceUnit :: Unit a => a -> AnonymousUnit
 reduceUnit u = reducer (sortFactors ts) (sortFactors bs) where
     (AnonymousUnit (ts,bs)) = toFrac u
+
     sortFactors :: [(a,BaseUnit)] -> [(a,BaseUnit)]
     sortFactors = sortBy (compare `on` snd)
     reducer [] ys = AnonymousUnit ([],ys)
@@ -123,7 +125,7 @@ conversionFactor :: (Rational,BaseUnit) -> (Rational,BaseUnit)
                     -> Maybe Rational
 conversionFactor a@(ar,au) b@(br,bu)
     | not (isCompat au bu)  = Nothing
-    | au == bu              = Just $ br / ar
+    | au == bu              = Just $ ar / br
 -- TODO: handle compatible units from different systems
 
 -- multiset intersection for lists

@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Math.Environment where
 
+import Data.List
 import Data.Expression
 
 import Control.Monad.Trans.State.Strict
@@ -62,8 +63,14 @@ liftEnv m = do
 bindFunc :: (Monad m) => String -> Function -> EnvT m ()
 bindFunc n f = modify' $ over funcs ((n,f):)
 
+unbindFunc :: Monad m => String -> EnvT m ()
+unbindFunc n = modify' $ over funcs (filter (\(a,_)->a /= n))
+
 bindVar :: (Monad m) => String -> Expr -> EnvT m ()
 bindVar n e = modify' $ over vars ((n,e):)
+
+unbindVar :: Monad m => String -> EnvT m ()
+unbindVar n = modify' $ over vars (filter (\(a,_)->a /= n))
 
 evalEnvT :: (Monad m) => Environment -> EnvT m a -> m a
 evalEnvT e m = evalStateT m e

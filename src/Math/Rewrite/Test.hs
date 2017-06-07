@@ -33,6 +33,10 @@ rewriteTest nm src dst = satisfy nm (forAll src (\e->simplify e == dst))
 reduces :: String -> [Expr] -> Expr -> Test
 reduces n xs e = satisfy n $ all (\x->simplify x == e) xs
 
+-- test that the given expression reduces to a given target
+reduces' :: String -> Expr -> Expr -> Test
+reduces' n x e = satisfy n $ simplify x == e
+
 -- generate more complex alternate forms for the given expr
 --genAlternate :: Expr -> Gen Expr
 
@@ -53,9 +57,9 @@ sumExprs (x:xs) = BinaryExpr Add x $ sumExprs xs
 divMulTreeGen :: Gen Expr
 divMulTreeGen = oneof [return (csti 1),
     liftM2 (\t c->BinaryExpr Divide (BinaryExpr Multiply c t) c)
-        divMulTreeGen (liftM csti $ choose (0,500)),
+        divMulTreeGen (liftM csti $ choose (1,500)),
     liftM2 (\t c->BinaryExpr Multiply (BinaryExpr Divide t c) c)
-        divMulTreeGen (liftM csti $ choose (0,500))]
+        divMulTreeGen (liftM csti $ choose (1,500))]
 
 tests :: IO [Test]
 tests = return $ [
@@ -74,6 +78,10 @@ tests = return $ [
                             (liftM2 (,) (choose (0,5000)) (choose (-50,50)))])
                     >>= Q.shuffle))
                 (csti 0),
-            rewriteTest "exact-one-mul-div" divMulTreeGen (csti 1)
+            rewriteTest "exact-one-mul-div" divMulTreeGen (csti 1),
+            reduces' "exact-int-subtraction"
+                (BinaryExpr Subtract (Constant (ExactReal 1212 (-3) noUnit))
+                                     (Constant (IntValue  1 noUnit)))
+                (Constant (ExactReal  212 (-3) noUnit))
         ]
     ]
