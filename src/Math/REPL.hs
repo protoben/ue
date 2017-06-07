@@ -63,6 +63,12 @@ bindVar s e = lift $ E.bindVar s e
 bindFunc :: Monad m => String -> E.Function -> ReplT m ()
 bindFunc s f = lift $ E.bindFunc s f
 
+unbindVar :: Monad m => String -> ReplT m ()
+unbindVar s = lift $ E.unbindVar s
+
+unbindFunc :: Monad m => String -> ReplT m ()
+unbindFunc s = lift $ E.unbindFunc s
+
 saveResult :: Monad m => Expr -> ReplT m Expr
 saveResult e = modify' (set previous (Just e)) >> return e
 
