@@ -7,13 +7,23 @@ import Text.REPL
 import UI.REPL
 
 import Control.Monad
-import Control.Monad.Trans.Class
+import Control.Monad.Trans.Class as T
 import Control.Monad.IO.Class
 
-main :: IO ()
-main = runREPL readline writeline where
-    writeline :: TextOut -> ReplT IO ()
-    writeline = liftIO . putStrLn . colorize
+import System.Console.Haskeline
+import System.Console.Haskeline.Completion
 
-    readline :: ReplT IO String
-    readline = liftIO getLine
+prompt :: TextOut
+prompt = [(Prompt, "$ ")]
+
+settings = setComplete noCompletion defaultSettings
+
+main :: IO ()
+main = runInputT settings $ runREPL readline writeline where
+    writeline :: TextOut -> ReplT (InputT IO) ()
+    writeline = liftRepl . outputStrLn . colorize
+
+    readline :: ReplT (InputT IO) String
+    readline = liftRepl (getInputLine $ colorize prompt) >>= (\e->case e of
+        Nothing -> readline
+        Just l  -> return l)

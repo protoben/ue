@@ -82,3 +82,6 @@ withBindings v f m = do
     (e,nc) <- lift $ E.withBindings v f $ runStateT m ctx
     put nc -- commit changes to the state
     return e
+
+liftRepl :: Monad m => m a -> ReplT m a
+liftRepl = lift . lift
