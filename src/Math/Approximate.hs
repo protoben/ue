@@ -102,13 +102,21 @@ approx (RelationExpr op a b) = case (approx a, approx b) of
     (Right l, Left _)  -> Right $ RelationExpr op l b
     (Left le, Left re) -> Left le
 approx e = if containsSymbols e then Left NotConcrete
-                                else (Constant . reduceInts) <$> approx' e where
-    reduceInts :: Value -> Value
-    reduceInts v@(IntValue n u) = v
-    reduceInts v@(ExactReal m n u) = if n >= 0 then (IntValue (m*(10^n)) u)
-        else (if m `mod` (10^(-n)) == 0
-            then (IntValue (m `div` (10^(-n))) u) else v)
-    reduceInts v = v
+                                else (Constant . reduceVal) <$> approx' e where
+    -- try removing decimal places without losing precision
+    reduceExact :: Value -> Value
+    reduceExact v@(ExactReal m n u) = if m `mod` 10 /= 0 then v
+                                      else reduceExact $ ExactReal (m `div` 10)
+                                                                   (n + 1) u
+
+    reduceVal :: Value -> Value
+    reduceVal v@(IntValue n u) = v
+    reduceVal v@(ExactReal m n u) =
+        if n >= 0 then (IntValue (m*(10^n)) u) -- easy case - just multiply
+        else (if m `mod` (10^(-n)) == 0 -- check that we can safely convert
+            then (IntValue (m `div` (10^(-n))) u)
+            else reduceExact v) -- try reducing decimal precision
+    reduceVal v = v
 
     approx' :: Expr -> ApproxResult
     approx' (BinaryExpr op a b) =
