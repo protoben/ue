@@ -35,13 +35,19 @@ systemUnit sys = choice [
 
 systems = [mks]
 
+-- exponentiate the subparser if possible
+expUnit :: Monad m => CParserT m AnonymousUnit -> CParserT m AnonymousUnit
+expUnit up = up >>= (\u->choice
+    [char '^' >> try ((\x->unitPow (read [x]) u) <$> digit),
+     return u])
+
 -- parse a primitive unit, not part of any unit system
 primUnit :: Monad m => CParserT m AnonymousUnit
-primUnit = choice $ map (try . systemUnit) systems
+primUnit = expUnit (choice $ map (try . systemUnit) systems)
 
 -- parse an atomic unit
 primAtomic :: Monad m => CParserT m AnonymousUnit
-primAtomic = liftM toFrac $ choice $ map (try . atomicUnit) systems
+primAtomic = expUnit (liftM toFrac $ choice $ map (try . atomicUnit) systems)
 
 type AU = AnonymousUnit
 
@@ -51,3 +57,5 @@ unit = (try primAtomic) <|> (buildExpressionParser exprTable primUnit) where
     exprTable = [[lassoc '/' (>/), lassoc '*' (>*)]]
     lassoc :: Monad m => Char -> (AU -> AU -> AU) -> Operator String () m AU
     lassoc c o = Infix (char c >> return o) AssocLeft
+    rassoc :: Monad m => Char -> (AU -> AU -> AU) -> Operator String () m AU
+    rassoc c o = Infix (char c >> return o) AssocRight
