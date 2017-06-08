@@ -8,6 +8,7 @@ module Data.Units.Types (
     ) where
 
 import Data.List
+import Data.Ratio
 import Data.Function
 
 import Control.Arrow
@@ -94,12 +95,12 @@ instance Unit AnonymousUnit where
     toFrac x = x
 
 (>*) :: (Unit a, Unit b) => a -> b -> AnonymousUnit
-(>*) a b = reduceUnit $ AnonymousUnit (aTop ++ bTop, aBot ++ bBot) where
+(>*) a b = reduceUnitSimple $ AnonymousUnit (aTop ++ bTop, aBot ++ bBot) where
     (AnonymousUnit (aTop,aBot)) = toFrac a
     (AnonymousUnit (bTop,bBot)) = toFrac b
 
 (>/) :: (Unit a, Unit b) => a -> b -> AnonymousUnit
-(>/) a b = reduceUnit $ AnonymousUnit (aTop ++ bBot, aBot ++ bTop) where
+(>/) a b = reduceUnitSimple $ AnonymousUnit (aTop ++ bBot, aBot ++ bTop) where
     (AnonymousUnit (aTop,aBot)) = toFrac a
     (AnonymousUnit (bTop,bBot)) = toFrac b
 
@@ -108,10 +109,13 @@ inv = (\(AnonymousUnit (a,b))->(AnonymousUnit (b,a))) . toFrac
 
 unitPow :: (Unit a) => Int -> a -> AnonymousUnit
 unitPow n u = let (AnonymousUnit (t,b)) = toFrac u in
-    reduceUnit $ AnonymousUnit (concat $ replicate n t,concat $ replicate n b)
+    reduceUnitSimple $ AnonymousUnit
+        (concat $ replicate n t,concat $ replicate n b)
 
-reduceUnit :: Unit a => a -> AnonymousUnit
-reduceUnit u = reducer (sortFactors ts) (sortFactors bs) where
+-- Cancel out equivalent dimensions. Note that this doesn't work for units which
+-- are scaled versions of one another.
+reduceUnitSimple :: Unit a => a -> AnonymousUnit
+reduceUnitSimple u = reducer (sortFactors ts) (sortFactors bs) where
     (AnonymousUnit (ts,bs)) = toFrac u
 
     sortFactors :: [(a,BaseUnit)] -> [(a,BaseUnit)]
@@ -119,6 +123,62 @@ reduceUnit u = reducer (sortFactors ts) (sortFactors bs) where
     reducer [] ys = AnonymousUnit ([],ys)
     reducer (x:xs) ys = if elem x ys then reducer xs (delete x ys) else
         let (AnonymousUnit (ts,bs)) = reducer xs ys in AnonymousUnit (x:ts,bs)
+
+-- Reduce a unit to its simplest form and return the value multiplier that's
+-- left over after reduction. This version works for scaled multiples
+reduceUnit :: Unit a => a -> (Rational, AnonymousUnit)
+reduceUnit x = (finalFactor, finalUnit) where
+    (AnonymousUnit (ts,bs)) = toFrac x
+    (ts', bs') = (sort $ map snd ts, sort $ map snd bs)
+
+    -- take the base-10 log of an integer rounded down
+    log10 :: Rational -> Integer
+    log10 x = (case (numerator x, denominator x) of
+        (1, n) -> -(log10' n)
+        (n, 1) -> log10' n
+        (n, m) -> 0) where
+            log10' x = if x `mod` 10 == 0 then 1+log10' (x `div` 10) else 0
+
+    -- split an integer at the edge of a given range and return the inner and
+    -- outer parts separately
+    splitRange :: (Integer,Integer) -> Integer -> (Integer, Integer)
+    splitRange (low, high) x = case (x < low, x > high) of
+        (True, False)  -> (low, x-low)
+        (False, True)  -> (high, x-high)
+        (False, False) -> (x, 0)
+
+    -- remove multiples from everything to build final scale factor. this might
+    -- not be a power of 1000, so we have to do more work to make sure it is. If
+    -- a unit multiple doesn't have a corresponding derived unit, the system can
+    -- get confused
+    factor = product (map fst ts) / product (map fst bs)
+    factorLog = log10 factor
+
+    -- avoid going above or below the limits of SI prefixes
+    thousands = splitRange (-24, 24) $ factorLog - (factorLog `mod` 3)
+
+    siFactor = 10^(fst thousands)
+    extFactor = 10^(snd thousands + factorLog `mod` 3)
+
+    finalFactor = if finalUnit /= noUnit then extFactor else factor
+
+    -- compute the final unit. If it's non-empty, multiply the residual factor
+    -- into the first component on top. If no top unit exists, multiply it in
+    -- on the bottom (after taking the reciprocal).
+    finalUnit = case reduced of
+        (AnonymousUnit ([],[])) -> noUnit
+        (AnonymousUnit ((t:ts),b)) -> let newFirst = (fst t * siFactor, snd t)
+                                      in AnonymousUnit ((newFirst:ts), b)
+        (AnonymousUnit ([],(b:bs))) -> let newFirst = (fst b / siFactor, snd b)
+                                       in AnonymousUnit ([], (newFirst:bs))
+
+    reduced = let (t,b) = reducer ts' bs'; tag = (\x->(1,x))
+              in AnonymousUnit (map tag t, map tag b)
+
+    reducer :: [BaseUnit] -> [BaseUnit] -> ([BaseUnit], [BaseUnit])
+    reducer [] ys = ([],ys)
+    reducer (x:xs) ys = if elem x ys then reducer xs (delete x ys) else
+        let (ts,bs) = reducer xs ys in (x:ts,bs)
 
 -- find the conversion factor from one basic unit to another
 conversionFactor :: (Rational,BaseUnit) -> (Rational,BaseUnit)

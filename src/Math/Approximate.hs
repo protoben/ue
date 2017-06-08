@@ -55,7 +55,6 @@ sameUnits (a,b) = case (valueUnit b) >>= (convertValue a) of
     Nothing -> Left TypeError
     Just r  -> Right (r,b)
 
--- TODO: Implement conversions between different units with matching dimensions
 approxBinary :: BinOp -> Value -> Value -> ApproxResult
 approxBinary o (IntValue n u) e@(ExactReal _ _ _) =
     approxBinary o (ExactReal n 0 u) e
@@ -102,13 +101,25 @@ approx (RelationExpr op a b) = case (approx a, approx b) of
     (Right l, Left _)  -> Right $ RelationExpr op l b
     (Left le, Left re) -> Left le
 approx e = if containsSymbols e then Left NotConcrete
-                                else (Constant . reduceInts) <$> approx' e where
+                                else Constant . simplifyVal <$> approx' e where
+    simplifyVal :: Value -> Value
+    simplifyVal = simpleUnit . reduceInts
+
     reduceInts :: Value -> Value
     reduceInts v@(IntValue n u) = v
     reduceInts v@(ExactReal m n u) = if n >= 0 then (IntValue (m*(10^n)) u)
         else (if m `mod` (10^(-n)) == 0
             then (IntValue (m `div` (10^(-n))) u) else v)
     reduceInts v = v
+
+    simpleUnit :: Value -> Value
+    simpleUnit v = case valueUnit v of
+        Nothing -> v
+        Just u  -> case reduceUnit u of
+            (1,r) -> forceUnit r v
+            (m,r) -> case ratMultiple v m of
+                Nothing -> v
+                Just rv -> forceUnit r rv
 
     approx' :: Expr -> ApproxResult
     approx' (BinaryExpr op a b) =

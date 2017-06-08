@@ -1,7 +1,7 @@
 module Data.Expression (
     Expr(..), Value(..), BinOp(..), UnaryOp(..), Relation(..), VariableRef(..),
     containsSymbols, allSymbols,
-    valueUnit, convertValue, forceUnit,
+    valueUnit, convertValue, forceUnit, ratMultiple,
     display, treeDepth, substM, subst, substVar) where
 
 import Data.List
@@ -112,27 +112,28 @@ valueUnit (IntValue _ u)    = Just u
 valueUnit (ExactReal _ _ u) = Just u
 valueUnit _                 = Nothing
 
+-- try to multiply a value by a rational scalar, producing the simplest
+-- result possible
+ratMultiple :: Value -> Rational -> Maybe Value
+ratMultiple (IntValue n u) r
+    | denominator r == 1 = Just $ IntValue (n * numerator r) u
+    | numerator r == 1   = if n `mod` denominator r == 0
+                           then Just$IntValue (n `div` (denominator r)) u
+                           else Just$ExactReal
+                               ((n*10^30) `div` (denominator r)) (-30) u
+    | otherwise          = Nothing
+ratMultiple (ExactReal n e u) r
+    | denominator r == 1 = Just $ ExactReal (n*numerator r) e u
+    | numerator r == 1   = Just $ ExactReal (n `div` (denominator r)) e u
+    | otherwise          = Nothing
+ratMultiple _ _ = Nothing
+
 -- convert a value to a different unit
 convertValue :: Unit a => Value -> a -> Maybe Value
 convertValue x tgt = fmap (forceUnit goal) (valueUnit x >>=
                                             (\u->convertUnit u tgt) >>=
-                                            multiply x) where
+                                            ratMultiple x) where
     goal = toFrac tgt
-    -- try to multiply a value by a rational scalar, producing the simplest
-    -- result possible
-    multiply :: Value -> Rational -> Maybe Value
-    multiply (IntValue n u) r
-        | denominator r == 1 = Just $ IntValue (n * numerator r) u
-        | numerator r == 1   = if n `mod` denominator r == 0
-                               then Just$IntValue (n `div` (denominator r)) u
-                               else Just$ExactReal
-                                   ((n*10^30) `div` (denominator r)) (-30) u
-        | otherwise          = Nothing
-    multiply (ExactReal n e u) r
-        | denominator r == 1 = Just $ ExactReal (n*numerator r) e u
-        | numerator r == 1   = Just $ ExactReal (n `div` (denominator r)) e u
-        | otherwise          = Nothing
-    multiply _ _ = Nothing
     -- TODO: allow specifying precision here
 
 data ParentType = TopLevel | AddSub | Sub | Mul | Div | PowerLeft |

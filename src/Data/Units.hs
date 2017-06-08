@@ -35,6 +35,9 @@ findDerivedUnit (AnonymousUnit tb) = listToMaybe results where
         findInSystem s = find (\(DerivedUnit _ _ ts bs)->(ts,bs)==tb) $
             derivedUnits s
 
+findSystemUnit :: AnonymousUnit -> Maybe DerivedUnit
+findSystemUnit u = findAtomicUnit u <|> findDerivedUnit u
+
 data NamedUnit = Base BaseUnit | Derived DerivedUnit deriving (Eq,Show)
 
 -- decomposed units use negative exponents for fractions
@@ -150,7 +153,7 @@ renderUnit us = intercalate "*" $ map showPiece us where
         else displayUnit $ AnonymousUnit (map (\(a,b)->(a*r,b)) ts, bs)
 
 displayUnit :: Unit a => a -> String
-displayUnit u = case findAtomicUnit $ toFrac u of
+displayUnit u = case findSystemUnit $ toFrac u of
     Nothing -> renderUnit $ decomposeUnit $ decompose u
     Just (DerivedUnit a n _ _) -> a
 

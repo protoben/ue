@@ -43,7 +43,9 @@ siPrefixes :: DerivedUnit -> UnitM ()
 siPrefixes u = mapM_ (addPrefix u) prefixes where
     addPrefix :: DerivedUnit -> (String,String,Rational) -> UnitM DerivedUnit
     addPrefix (DerivedUnit a n ts bs) (p,pn,k) = unit (p++a) (pn++n) $
-        AnonymousUnit ((map (\(r,u)->(k*r, u)) ts),bs)
+        AnonymousUnit (onHead (\(r,u)->(k*r, u)) ts, bs) where
+            onHead f [] = []
+            onHead f (x:xs) = (f x):xs
 
 -- generate SI prefixes for the given base unit, excepting the unit itself
 siPrefixesBase :: BaseUnit -> UnitM ()

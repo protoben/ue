@@ -114,14 +114,12 @@ simplifyArithmetic e@(BinaryExpr Subtract (Constant _) (Constant _)) =
     maybeEither $ approx e
 simplifyArithmetic e@(BinaryExpr Multiply (Constant _) (Constant _)) =
     maybeEither $ approx e
-simplifyArithmetic (BinaryExpr Power -- whether to simplify constant chosen by heuristic
-    (Constant (IntValue a u))
-    (Constant (IntValue b v))) = if (isCompat v noUnit && a^b < 1000) then
-        Just $ Constant $ IntValue (a^b) u else Nothing
-simplifyArithmetic (BinaryExpr Divide
-    (Constant (IntValue a u))
-    (Constant (IntValue b v))) = if (a `mod` b) == 0 then
-        (Just $ Constant $ IntValue (a `div` b) (u >/ v)) else Nothing
+simplifyArithmetic e@(BinaryExpr Power -- whether to simplify constant chosen by heuristic
+    (Constant (IntValue a u)) (Constant (IntValue b v))) =
+        if a^b < 1000 then maybeEither $ approx e else Nothing
+simplifyArithmetic e@(BinaryExpr Divide (Constant (IntValue a u))
+                                        (Constant (IntValue b v))) =
+        if (a `mod` b) == 0 then maybeEither $ approx e else Nothing
 simplifyArithmetic e@(UnaryExpr Negate (Constant _)) = maybeEither $ approx e
 simplifyArithmetic _ = Nothing
 
