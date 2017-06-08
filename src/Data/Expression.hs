@@ -50,11 +50,20 @@ instance Dimensioned Value where
     dimension (Vec2 _ _) = Dimensionless
     dimension (VecN _) = Dimensionless
 
+-- pad a string on the left with zeroes
+padLeft :: Integer -> String -> String
+padLeft n s = if length s < (fromIntegral n)
+              then concat [replicate (fromIntegral n - length s) '0', s] else s
+
 instance Displayable Value where
     display (IntValue i u) = (Numeric,show i):(display u)
-    display (ExactReal n e u) = let s = show n in
-        ((\(a,b)->(Numeric, concat [a, ".", b])) $
-        splitAt (length s + fromIntegral e) s):(display u)
+    display (ExactReal n e u) = (case compare e 0 of
+        EQ -> (Numeric, show n)
+        LT -> let s = padLeft (-e) $ show n;
+                      (a,b) = splitAt (length s + fromIntegral e) s in
+                  (Numeric, concat [a, ".", b])
+        GT -> (Numeric, concat [show n, replicate (fromIntegral e) '0']))
+        :(display u)
     display (Vec2 a b) = concat [(Numeric,"<"):(display a),
                                  (Numeric,","):(display b),
                                  [(Numeric, ">")]]
