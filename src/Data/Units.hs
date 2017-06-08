@@ -136,17 +136,18 @@ recompose us = AnonymousUnit <$> (liftM2 (,) top btm) where
 -- |Render the pieces of a decomposed unit
 renderUnit :: DecomposedUnit -> String
 renderUnit us = intercalate "*" $ map showPiece us where
-    -- TODO: handle rational multiples of units
     showPiece :: (Rational, NamedUnit, Int) -> String
-    showPiece (_,u,p)
-        | p < 0  = showUnit u ++ "^(" ++ show p ++ ")"
-        | p == 1 = showUnit u
-        | p > 1  = showUnit u ++ "^" ++ show p
-        | otherwise = show (u,p)
+    showPiece (k,u,p)
+        | p < 0  = showUnit k u ++ "^(" ++ show p ++ ")"
+        | p == 1 = showUnit k u
+        | p > 1  = showUnit k u ++ "^" ++ show p
+        | otherwise = show (k,u,p)
 
-    showUnit :: NamedUnit -> String
-    showUnit (Base (BaseUnit a _ _)) = a
-    showUnit (Derived (DerivedUnit a _ _ _)) = a
+    showUnit :: Rational -> NamedUnit -> String
+    showUnit r (Base b@(BaseUnit a _ _)) = if r == 1 then a
+                                 else displayUnit $ AnonymousUnit ([(r,b)],[])
+    showUnit r (Derived (DerivedUnit a _ ts bs)) = if r == 1 then a
+        else displayUnit $ AnonymousUnit (map (\(a,b)->(a*r,b)) ts, bs)
 
 displayUnit :: Unit a => a -> String
 displayUnit u = case findAtomicUnit $ toFrac u of
