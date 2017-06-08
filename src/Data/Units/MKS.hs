@@ -1,5 +1,6 @@
 module Data.Units.MKS (mks) where
 
+import Data.Ratio
 import Data.Units.Types
 import Data.Units.Definition
 
@@ -19,6 +20,11 @@ mks = system [kg,m,cd,s,k,a] $ do
     siPrefixesBase s
     siPrefixesBase k
     siPrefixesBase a
+    
+    -- add prefixes to kilograms
+    mapM_ (\(p,pn,k)->unit (p ++ "g") (pn ++ "gram") $
+            AnonymousUnit ([(k * (1 % 1000), kg)],[])) $
+        filter (\(p,pn,k)->pn /= "kilo") prefixes
     hz <- atomic $ siPrefixed $ unit "Hz" "hertz"  $ inv s
     n  <- siPrefixed $ unit "N"  "newton" $ (kg >* m) >/ (s >* s)
     pa <- siPrefixed $ unit "Pa" "pascal" $ n >/ (m >* m)
