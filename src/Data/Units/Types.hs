@@ -225,7 +225,7 @@ factorLabel (AnonymousUnit (xs,ys)) (AnonymousUnit (xs',ys')) = factor where
     -- generate overall non-compatible unit factor from top and bottom factors
     topFactor = cvtDims (fst restX) (fst restY)
     btmFactor = cvtDims (snd restX) (snd restY)
-    factor = liftM2 (/) btmFactor topFactor
+    factor = liftM2 (\t b->t / b) topFactor btmFactor
 
 -- Return the conversion factor from one unit to another of the same dimension.
 -- If dimensions don't match, returns Nothing

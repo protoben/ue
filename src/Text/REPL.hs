@@ -103,6 +103,7 @@ evaluateCmd write Approximate e = substFuncs e >>= substVars >>=
                                   display u, [(ErrorMsg, " vs ")], display v]
         Left (UnitPowerError u)-> write [(ErrorMsg,
                                     "Value with units cannot be exponents")]
+        Left TypeError         -> write [(ErrorMsg, "Type error")]
         Left NotConcrete       -> write [(ErrorMsg,
                                   "Expression is not concrete")]
         Right e                -> saveResult e >>= write . display)

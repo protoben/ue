@@ -125,7 +125,13 @@ approx e = if containsSymbols e then Left NotConcrete
     approx' (BinaryExpr op a b) =
         approx' a >>= (\a->approx' b >>= (approxBinary op a))
     approx' (UnaryExpr Negate a) = flipSign <$> approx' a
-    approx' (TypeAssertion e _) = approx' e
+    approx' (TypeAssertion e u) = case approx' e of
+        Left e  -> Left e
+        Right r -> if isCompat u r
+            then (case convertValue r u of
+                Nothing -> Left TypeError
+                Just x  -> Right x)
+            else Left TypeError
     approx' (Constant v) = Right v
 
 compareValues :: Value -> Value -> Ordering
