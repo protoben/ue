@@ -86,16 +86,15 @@ mathExpr terms = buildExpressionParser exprTable (term terms)
 
 -- expression parser which allows custom term parsers
 exprExtended :: Monad m => [CParserT m Expr] -> CParserT m Expr
-exprExtended terms = (try relation) <|> (mathExpr terms)
+exprExtended terms = try relation <|> mathExpr terms
     where
         relation = do
             l <- mathExpr terms
-            op <- choice [
-                    try (symbol "=" >> return Equal),
-                    try (symbol "<=" >> return Lesser),
-                    try (symbol ">=" >> return Greater),
-                    try (symbol "<" >> return Lesser),
-                    try (symbol ">" >> return Greater)]
+            op <- choice [try (symbol "=" >> return Equal),
+                          try (symbol "<=" >> return Lesser),
+                          try (symbol ">=" >> return Greater),
+                          try (symbol "<" >> return Lesser),
+                          try (symbol ">" >> return Greater)]
             r <- mathExpr terms
             return $ RelationExpr op l r
 

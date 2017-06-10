@@ -83,7 +83,7 @@ forceUnit u (VecN xs) = VecN $ map (forceUnit u) xs
 instance Eq Value where
     (==) (IntValue n u) (IntValue m u') = (n,u) == (m,u')
     (==) (ExactReal d p u) (ExactReal d' p' u') = (d,p,u) == (d',p',u')
-    (==) _ _ = False
+    (==) _ _ = False -- no vector support yet
 
 data Expr =
     RelationExpr Relation Expr Expr |

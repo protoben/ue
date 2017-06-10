@@ -36,12 +36,12 @@ systemUnit sys = choice [
 systems = [mks]
 
 -- exponentiate the subparser if possible
-expUnit :: Monad m => CParserT m AnonymousUnit -> CParserT m AnonymousUnit
+expUnit :: (Monad m, Unit u) => CParserT m u -> CParserT m AnonymousUnit
 expUnit up = up >>= (\u->choice
     [char '^' >> try ((\x->unitPow (read [x]) u) <$> digit),
-     return u])
+     return (toFrac u)])
 
--- parse a primitive unit, not part of any unit system
+-- parse a primitive unit, not part of any specific unit system
 primUnit :: Monad m => CParserT m AnonymousUnit
 primUnit = expUnit (choice $ map (try . systemUnit) systems)
 

@@ -14,8 +14,9 @@ import Data.Function
 import Control.Arrow
 import Control.Monad
 
-data BaseDimension = Mass | Distance | Luminosity | Time | Temperature | Current
-    deriving (Show, Eq, Ord)
+data BaseDimension = Mass | Distance |
+                     Luminosity | Time |
+                     Temperature | Current deriving (Show, Eq, Ord)
 
 -- a dimension defined in terms of (t1*t2*t3...*tN)/(b1*b2*b3...*bN)
 data Dimension = Dimension [BaseDimension] [BaseDimension] | Dimensionless deriving Show
