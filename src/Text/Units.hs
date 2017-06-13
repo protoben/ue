@@ -53,9 +53,7 @@ type AU = AnonymousUnit
 
 -- parse a composite unit
 unit :: Monad m => CParserT m AnonymousUnit
-unit = (try primAtomic) <|> (buildExpressionParser exprTable primUnit) where
+unit = (try primAtomic) <|> (buildExpressionParser exprTable (try primUnit)) where
     exprTable = [[lassoc '/' (>/), lassoc '*' (>*)]]
     lassoc :: Monad m => Char -> (AU -> AU -> AU) -> Operator String () m AU
-    lassoc c o = Infix (char c >> return o) AssocLeft
-    rassoc :: Monad m => Char -> (AU -> AU -> AU) -> Operator String () m AU
-    rassoc c o = Infix (char c >> return o) AssocRight
+    lassoc c o = Infix (try (char c >> return o)) AssocLeft

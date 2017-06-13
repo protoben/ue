@@ -95,11 +95,15 @@ sortExprGroups = sortBy (\(a:_) (b:_)->mconcat $ map (\f->f a b)
             (dimensions u a) `mappend` (dimensions u b)
         dimensions _ _ = EQ
 
+mapApply f = f . map f
+reorderSum = mapApply expandSum . sortExprGroups . equalGroup . collapseSum
+
 -- REDUCTION: Reorder commutative operations so like terms are adjacent
 reorderLikeTerms :: Expr -> Expr
-reorderLikeTerms e@(BinaryExpr Subtract a b) = expandSum $ map expandSum $ sortExprGroups $ equalGroup $ collapseSum e
-reorderLikeTerms e@(BinaryExpr Add a b) = expandSum $ map expandSum $ sortExprGroups $ equalGroup $ collapseSum e
-reorderLikeTerms e@(BinaryExpr Multiply a b) = expandProd $ map expandProd $ sortExprGroups $ equalGroup $ collapseProd e
+reorderLikeTerms e@(BinaryExpr Subtract a b) = reorderSum e
+reorderLikeTerms e@(BinaryExpr Add a b) = reorderSum e
+reorderLikeTerms e@(BinaryExpr Multiply a b) =
+    mapApply expandProd $ sortExprGroups $ equalGroup $ collapseProd e
 reorderLikeTerms e = e
 
 maybeEither :: Either a b -> Maybe b

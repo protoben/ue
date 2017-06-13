@@ -81,13 +81,12 @@ rewriteRules =
 
     -- solve simple algebra
     (n =* a =: m, a =: m =/ n), (n =/ a =: m, a =: m =* n),
-    (n =+ a =: m, a =: m =- n), (a =- n =: m, a =: m =+ n)
+    (n =+ a =: m, a =: m =- n), (a =- n =: m, a =: m =+ n),
+    (a =* b =: c =* (b =^ d), a =: c =* (b =^ (d =- csti 1))),
+    (a =* b =: (b =^ d) =* c, a =: c =* (b =^ (d =- csti 1))),
+    (b =* a =: c =* (b =^ d), a =: c =* (b =^ (d =- csti 1))),
+    (b =* a =: (b =^ d) =* c, a =: c =* (b =^ (d =- csti 1)))
     ]
-    where
-        cst :: Value -> RRExpr
-        cst = RRExpr . Constant
-
-        csti n = cst (IntValue n noUnit)
 
 reductionRules = [simplifyArithmetic,
                   onChange reorderLikeTerms,

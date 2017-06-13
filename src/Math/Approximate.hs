@@ -46,7 +46,7 @@ exactIntPower (n,e,u) p = ExactReal (n ^ p) (e * p) (unitPow (fromIntegral p) u)
 
 -- raise a value to an exact fractional power
 exactFracPower :: (Integer,Integer,AnonymousUnit) -> (Integer,Integer) -> Value
-exactFracPower (a,ae,u) (b,be) = ExactReal 0 0 u
+exactFracPower (a,ae,u) (b,be) = ExactReal 1 0 u
 -- TODO: Implement this properly
 
 -- try to make two values have the same unit
@@ -79,7 +79,8 @@ approxBinary Divide   (IntValue a u) (IntValue b u') = if (mod a b) == 0
     then Right $ IntValue (div a b) (u >/ u')
     else approxBinary Divide (ExactReal a 0 u) (ExactReal b 0 u')
 approxBinary Power l@(IntValue a u) r@(IntValue b u') =
-    if (dimension r) == Dimensionless then Right $ IntValue (a ^ b) u
+    if (dimension r) == Dimensionless then Right $ IntValue (a ^ b)
+                                                            (unitPow (fromIntegral b) u)
                                       else Left $ UnitPowerError u'
 approxBinary Subtract (ExactReal a ae u) (ExactReal b be u') =
     approxBinary Add (ExactReal a ae u) (ExactReal (-b) be u')
@@ -88,10 +89,11 @@ approxBinary Multiply (ExactReal a ae u) (ExactReal b be u') = Right $
 approxBinary Divide   (ExactReal a ae u) (ExactReal b be u') = Right $
     ExactReal (a*(10^30) `div` b) (ae-be-30) (u >/ u') -- fix precision here
 approxBinary Power    l@(ExactReal a ae u) r@(ExactReal b be u') =
-    if dimension u' /= Dimensionless then
-        approxBinary Multiply
-            (exactIntPower (a,ae,u) $ ipartExact (b,be))
-            (exactFracPower (a,ae,u) $ fpartExact (b,be))
+    if dimension u' == Dimensionless then
+        forceUnit (unitPow (fromIntegral $ ipartExact (b,be)) u) <$>
+            approxBinary Multiply
+                (exactIntPower (a,ae,u) $ ipartExact (b,be))
+                (exactFracPower (a,ae,u) $ fpartExact (b,be))
     else Left $ UnitPowerError u'
 
 approx :: Expr -> Either ApproxError Expr
@@ -113,9 +115,9 @@ approx e = if containsSymbols e then Left NotConcrete
     reduceVal :: Value -> Value
     reduceVal v@(IntValue n u) = v
     reduceVal v@(ExactReal m n u) =
-        if n >= 0 then (IntValue (m*(10^n)) u) -- easy case - just multiply
+        if n >= 0 then IntValue (m*(10^n)) u -- easy case - just multiply
         else (if m `mod` (10^(-n)) == 0 -- check that we can safely convert
-            then (IntValue (m `div` (10^(-n))) u)
+            then IntValue (m `div` (10^(-n))) u
             else reduceExact v) -- try reducing decimal precision
     reduceVal v = v
 
