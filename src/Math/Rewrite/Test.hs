@@ -15,7 +15,7 @@ satisfy n p = Test $ TestInstance {
         run = quickCheckResult p >>= (\x->return $ case x of
             (Success _ _ _) -> Finished Pass
             (GaveUp _ _ _)  -> Finished Pass
-            (Failure _ _ _ _ _ _ r _ _ _)  -> Finished $ Fail r
+            (Failure _ _ _ _ _ _ r _ _ _ _)  -> Finished $ Fail r
             (NoExpectedFailure _ _ _) -> Finished $ Fail "Expected failing property"
             (InsufficientCoverage _ _ _) -> Finished $ Fail "Insufficient coverage"
         ),
