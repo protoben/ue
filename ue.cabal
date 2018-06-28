@@ -14,6 +14,25 @@ cabal-version:       >=1.10
 
 executable ue
   main-is: Main.hs
+  other-modules:
+    Data.Display
+    Data.Expression
+    Data.Units
+    Data.Units.Definition
+    Data.Units.MKS
+    Data.Units.Types
+    Math.Approximate
+    Math.Environment
+    Math.Functions
+    Math.Functions.Derivative
+    Math.REPL
+    Math.Rewrite
+    Math.Rewrite.Engine
+    Math.Rewrite.Reductions
+    Text.Expression
+    Text.REPL
+    Text.Units
+    UI.REPL
   build-depends:
     base          >=4.9     && <4.12,
     parsec        >=3.1.11  && <3.2,
